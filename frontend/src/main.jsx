@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { LanguageProvider } from './i18n.jsx';
 import './styles.css';
 
 // HashRouter kullaniyoruz cunku GitHub Pages statik hosting'de
@@ -11,9 +12,11 @@ import './styles.css';
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <HashRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </LanguageProvider>
     </HashRouter>
   </React.StrictMode>
 );

@@ -1,0 +1,17 @@
+{
+  "name": "sts-envanter-local-server",
+  "version": "1.0.0",
+  "description": "STS Envanter icin yerel sunucu - Google Sheets API'ye dogrudan baglanir, Apps Script Web App'in yerini alir",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "google-auth-library": "^9.14.1",
+    "dotenv": "^16.4.5"
+  }
+}

@@ -1,0 +1,32 @@
+STS-Envarter - FATURALAR guncellemesi
+=====================================
+
+1) Bu zipi proje klasorunun ustune acin (ayni yola kopyalanir, eski dosyalarin yerini alir):
+   Expand-Archive -Path "<zip yolu>" -DestinationPath "C:\Users\abural\Desktop\STS-Envarter" -Force
+
+2) YEREL SUNUCU: local-server klasorunde calisan sunucuyu kapatip yeniden baslatin.
+   (Google Sheet'e elle sutun/sekme eklemeniz GEREKMEZ - "Faturalar" sekmesi ve
+   Ihtiyaclar/SarfSiparisleri'ne "FaturaID" sutunu ilk kullanimda otomatik olusur.)
+
+3) APPS SCRIPT (canli GitHub Pages surumu icin): apps-script/Code.gs dosyasinin TUM icerigini
+   Apps Script editorundeki Code.gs'in yerine yapistirin, kaydedin, sonra
+   Deploy > Manage deployments > (kalem) > New version > Deploy.
+
+4) FRONTEND: frontend klasorunde  npm run dev  (yerel)  veya  npm run deploy  (GitHub Pages).
+
+Yeni: soldaki menude "Faturalar" sayfasi; Ihtiyac Listesi'nde satir secip "Faturaya Bagla";
+Karsilananlar dahil her durumda "Duzenle" ile odeme/fatura/belge guncellenir.
+
+--- DUZELTME (Fatura baglama hatasi) ---
+Sorun: local-server/sheets.js icindeki onbellek temizleme yanlis anahtari siliyordu; yeni olusturulan fatura
+5 sn boyunca okunamiyor ve "Fatura bulunamadi: FTR-000x" hatasi veriyordu (satirlar faturaya baglanmiyordu).
+Bu zip bunu duzeltir. Yeni: Ihtiyac Listesi'nde "Fatura / Odeme" sutunu.
+Temizlik: Faturalar sayfasinda/sheet'te hatali denemelerden kalan bos faturalari (baglantisi olmayan FTR-0001, FTR-0002...) silin.
+
+=== TESLIM FORMU + YONETIM RAPORU (2026-10-22) ===
+- Calisan detayinda "Teslim Formlari" listesi (1.Teslim Form, 2.Teslim Form...). Yeni yuklenen form otomatik baglanir.
+- Panelde "Teslim formu eksik" karti (zimmetli ekipmani olup formu olmayan aktif calisanlar).
+- Calisanlar sayfasinda "Drive'daki formlari esle" butonu: ONCEDEN yuklenmis formlari dosya adindaki PersonelID ile calisanlara baglar (bir kez calistirin).
+- Yonetim Raporu: "Goruntule" yerine 1.Fatura Link, 2.Fatura Link... ve 1.Teslim Form, 2.Teslim Form... kolonlari.
+- Calisanlar sheet'ine otomatik "TeslimFormLink" kolonu eklenir.
+- Apps Script: Code.gs'i yapistirip yeni surum yayinlayin (TESLIM_FORM_FOLDER_ID script ozelliginde tanimli olmali).

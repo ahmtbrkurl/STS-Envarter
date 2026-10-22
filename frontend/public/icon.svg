@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1E3A52"/>
+  <rect x="96" y="140" width="320" height="232" rx="16" fill="none" stroke="#ffffff" stroke-width="20"/>
+  <line x1="96" y1="210" x2="416" y2="210" stroke="#ffffff" stroke-width="20"/>
+  <circle cx="256" cy="290" r="34" fill="#2E7D6B"/>
+  <text x="256" y="440" font-family="Arial, sans-serif" font-size="56" font-weight="700" fill="#ffffff" text-anchor="middle">BT</text>
+</svg>
