@@ -6,3 +6,5 @@ dist/
 
 desktop.ini
 frontend/.env.development.local
+
+vite.config.js.timestamp-*
