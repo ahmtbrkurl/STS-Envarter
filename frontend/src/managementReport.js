@@ -594,7 +594,7 @@ export async function exportManagementReport({ items, needs, employees, rates, t
   const missingComputerUpcoming = missingComputerEmployeesAll.filter((e) => { const d = startDiffDays(e); return d !== null && d > 0 && d <= 14; });
   const missingComputerCount = missingComputerNow.length;
   const upcomingMissingCount = missingComputerUpcoming.length;
-  const pendingComputerNeeds = needs.filter((n) => n.Durum === 'Bekleniyor' && ['Dizustu Bilgisayar', 'Masaustu Bilgisayar'].includes(n.Kategori));
+  const pendingComputerNeeds = needs.filter((n) => (n.Durum === 'Bekleniyor' || n.Durum === 'Onaylandi') && ['Dizustu Bilgisayar', 'Masaustu Bilgisayar'].includes(n.Kategori));
   const pendingDeviceCount = pendingComputerNeeds.length;
 
   // ---- Anlati kartlari (otomatik olusturulan icgoru cumleleri) ----
@@ -843,7 +843,7 @@ export async function exportManagementReport({ items, needs, employees, rates, t
       n.ID, n.PersonelAdi, n.Departman, translateCategory(n.Kategori, lang), n.MalzemeAdi || n.Aciklama,
       Number(n.Fiyat) || '', n.ParaBirimi, fiyatTRY, translateStatus(n.Durum, lang), n.PlanlananTarih, n.SiparisTarihi,
       n.Durum === 'Iptal' ? 0 : fiyatTRY,
-      n.Durum === 'Bekleniyor' ? 1 : 0, n.Durum === 'Siparis Verildi' ? 1 : 0
+      (n.Durum === 'Bekleniyor' || n.Durum === 'Onaylandi') ? 1 : 0, ['Siparis Verildi', 'Yolda', 'KismenAlindi'].includes(n.Durum) ? 1 : 0
     ];
   });
   const NEEDS_END = NEEDS_START + Math.max(0, needsRows.length - 1);
@@ -940,7 +940,7 @@ export async function exportManagementReport({ items, needs, employees, rates, t
     addRateSample(a.SatinAlmaTarihi || a.OlusturmaTarihi, a.ParaBirimi, Number(a.Fiyat), Number(a.FiyatTRY), t('nav_inventory'));
   });
   needs.forEach((n) => {
-    const dateStr = n.Durum === 'Bekleniyor' ? (n.PlanlananTarih || n.OlusturmaTarihi) : (n.SiparisTarihi || n.PlanlananTarih || n.OlusturmaTarihi);
+    const dateStr = (n.Durum === 'Bekleniyor' || n.Durum === 'Onaylandi') ? (n.PlanlananTarih || n.OlusturmaTarihi) : (n.SiparisTarihi || n.PlanlananTarih || n.OlusturmaTarihi);
     let fiyatTRY = Number(n.FiyatTRY) || 0;
     const cur = n.ParaBirimi || 'TRY';
     if (!fiyatTRY && n.Fiyat && cur !== 'TRY' && rates && rates[cur]) fiyatTRY = Number(n.Fiyat) * rates[cur];

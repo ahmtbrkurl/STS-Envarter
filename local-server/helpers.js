@@ -103,7 +103,7 @@ const IHTIYAC_HEADERS = [
 // Odeme durumu icin 3 sabit secenek - Listeler sheet'ine bagli degil,
 // Durum/DURUM_MAP gibi kodda sabit tutuluyor (kullaniciya ekstra kurulum
 // yaptirmamak icin).
-const ODEME_DURUMU_OPTIONS = ['Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
 const GUNLUK_HEADERS = ['Tarih', 'Kullanici', 'Islem', 'Detay'];
 const CLEAR_ASSIGNEE_STATUSES = ['Stok', 'Hurda', 'Elden Cikarildi', 'Kayip'];
 const SARF_HEADERS = ['ID', 'Ad', 'Kategori', 'UyumluModeller', 'Stok', 'MinStok', 'Birim', 'Lokasyon', 'Tedarikci', 'BirimFiyat', 'ParaBirimi', 'Notlar', 'OlusturmaTarihi', 'SonGuncelleme'];
@@ -299,15 +299,30 @@ function driveFileId(url) {
 
 // urls'i calisanin mevcut TeslimFormLink listesine (tekrarsiz) ekler. Eklenen sayiyi dondurur.
 async function addEmployeeTeslimFormLinks(match, urls) {
-  const emps = await sheets.sheetToObjects(SHEET_NAMES.CALISANLAR);
-  const emp = emps.find((e) => (match.personelId && e.PersonelID === match.personelId))
-    || emps.find((e) => match.adSoyad && e.AdSoyad === match.adSoyad);
-  if (!emp) return 0;
-  const existing = splitLinks(emp.TeslimFormLink);
+  // Satir PersonelID ile (yoksa AdSoyad ile) bulunur ve O SATIRA yazilir - ayni adli
+  // iki calisan varsa form yanlis kisiye gitmesin diye updateEmployee(ad) kullanilmaz.
+  await getEffectiveHeaders(SHEET_NAMES.CALISANLAR, CALISAN_HEADERS);
+  const rows = await sheets.getSheetValues(SHEET_NAMES.CALISANLAR);
+  const hdr = rows[0] || [];
+  const idCol = hdr.indexOf('PersonelID');
+  const nameCol = hdr.indexOf('AdSoyad');
+  const linkCol = hdr.indexOf('TeslimFormLink');
+  if (linkCol === -1) return 0;
+  let idx = -1;
+  if (match.personelId && idCol !== -1) {
+    for (let i = 1; i < rows.length; i++) { if (rows[i][idCol] === match.personelId) { idx = i; break; } }
+  }
+  if (idx === -1 && match.adSoyad && nameCol !== -1) {
+    for (let i = 1; i < rows.length; i++) { if (rows[i][nameCol] === match.adSoyad) { idx = i; break; } }
+  }
+  if (idx === -1) return 0;
+  const existing = splitLinks(rows[idx][linkCol]);
   const have = new Set(existing.map(driveFileId));
   const toAdd = urls.filter((u) => u && !have.has(driveFileId(u)));
   if (!toAdd.length) return 0;
-  await updateEmployee(emp.AdSoyad, { TeslimFormLink: existing.concat(toAdd).join(', ') });
+  const newRow = hdr.map((h, i) => (rows[idx][i] === undefined ? '' : rows[idx][i]));
+  newRow[linkCol] = existing.concat(toAdd).join(', ');
+  await sheets.updateRow(SHEET_NAMES.CALISANLAR, idx + 1, newRow);
   return toAdd.length;
 }
 
@@ -339,7 +354,7 @@ async function syncTeslimFormLinks(files) {
 function needRateDate(data) {
   const durum = data.Durum || 'Bekleniyor';
   const today = nowStr().slice(0, 10);
-  if (durum === 'Bekleniyor') return data.PlanlananTarih || data.OlusturmaTarihi || today;
+  if (durum === 'Bekleniyor' || durum === 'Onaylandi') return data.PlanlananTarih || data.OlusturmaTarihi || today;
   return data.SiparisTarihi || data.PlanlananTarih || data.OlusturmaTarihi || today;
 }
 
@@ -814,6 +829,8 @@ function aggregatePayment(rows) {
   const st = rows.map((r) => r.OdemeDurumu || 'Odenmedi');
   let durum = 'KismenOdendi';
   if (st.length && st.every((s) => s === 'Odendi')) durum = 'Odendi';
+  else if (st.length && st.every((s) => s === 'TeklifFiyat')) durum = 'TeklifFiyat';
+  else if (st.every((s) => s === 'TeklifFiyat' || s === 'Odenmedi')) durum = 'Odenmedi';
   else if (!st.length || st.every((s) => s === 'Odenmedi')) durum = 'Odenmedi';
   const dates = rows
     .filter((r) => (r.OdemeDurumu === 'Odendi' || r.OdemeDurumu === 'KismenOdendi') && r.OdemeTarihi)
@@ -993,7 +1010,7 @@ async function deleteFatura(id) {
 // Tedarikci + Siparis Tarihi'ne gore gruplar (ayni gun ayni tedarikciye verilen
 // siparisler genelde tek faturadir). Hicbir sey YAZMAZ - sadece oneri dondurur.
 async function suggestFaturaGroups() {
-  const okDurum = ['Siparis Verildi', 'Karsilandi'];
+  const okDurum = ['Siparis Verildi', 'Yolda', 'KismenAlindi', 'Karsilandi'];
   const eligible = (r) => okDurum.indexOf(r.Durum) !== -1 && !r.FaturaID && r.Tedarikci && r.SiparisTarihi;
   const needs = (await sheets.sheetToObjects(SHEET_NAMES.IHTIYACLAR)).filter(eligible);
   const sarf = (await getSarfSiparisleri()).filter(eligible);

@@ -99,7 +99,7 @@ async function getDashboard() {
     totalTRY: Math.round(totalTRY * 100) / 100,
     totalRUB: Math.round(totalRUB * 100) / 100,
     warrantyExpiringSoon,
-    pendingNeeds: needs.filter((n) => n.Durum === 'Bekleniyor').length,
+    pendingNeeds: needs.filter((n) => n.Durum === 'Bekleniyor' || n.Durum === 'Onaylandi').length,
     lowStockCount: sarf.filter((m) => Number(m.Stok || 0) <= Number(m.MinStok || 0)).length
   };
 }

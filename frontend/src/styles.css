@@ -352,6 +352,7 @@ tbody tr:hover { background: var(--bg); cursor: pointer; }
 .badge-accent { background: var(--accent-soft); color: var(--accent); }
 .badge-amber { background: var(--amber-soft); color: var(--amber); }
 .badge-red { background: var(--red-soft); color: var(--red); }
+.badge-blue { background: #e0ecff; color: #1d4ed8; }
 .badge-gray { background: var(--gray-soft); color: var(--gray); }
 
 /* ===== Toolbar / filters ===== */

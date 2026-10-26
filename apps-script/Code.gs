@@ -63,7 +63,7 @@ const IHTIYAC_HEADERS = [
   'OdemeDurumu', 'OdemeTarihi', 'ProformaLink', 'FaturaID', 'TopluID'
 ];
 // helpers.js'deki ODEME_DURUMU_OPTIONS ile ayni - 3 sabit secenek.
-const ODEME_DURUMU_OPTIONS = ['Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
 
 const GUNLUK_HEADERS = ['Tarih', 'Kullanici', 'Islem', 'Detay'];
 
@@ -1065,7 +1065,8 @@ function driveFileId_(url) {
 }
 
 function addEmployeeTeslimFormLinks_(match, urls) {
-  const sheet = ensureSheet_(ss_(), SHEETS.CALISANLAR, CALISAN_HEADERS);
+  const sheet = ss_().getSheetByName(SHEETS.CALISANLAR);
+  if (!sheet) return 0;
   const headers = getEffectiveHeaders_(sheet, CALISAN_HEADERS);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return 0;
@@ -1095,7 +1096,8 @@ function syncTeslimFormLinks_() {
   const groups = {};
   const unmatched = [];
   let total = 0;
-  const sheet = ensureSheet_(ss_(), SHEETS.CALISANLAR, CALISAN_HEADERS);
+  const sheet = ss_().getSheetByName(SHEETS.CALISANLAR);
+  if (!sheet) throw new Error('Calisanlar sayfasi bulunamadi.');
   const headers = getEffectiveHeaders_(sheet, CALISAN_HEADERS);
   const lastRow = sheet.getLastRow();
   const ids = {};
@@ -1148,7 +1150,7 @@ function nextNeedId_() {
 function needRateDate_(data) {
   const durum = data.Durum || 'Bekleniyor';
   const today = nowStr_().slice(0, 10);
-  if (durum === 'Bekleniyor') return data.PlanlananTarih || data.OlusturmaTarihi || today;
+  if (durum === 'Bekleniyor' || durum === 'Onaylandi') return data.PlanlananTarih || data.OlusturmaTarihi || today;
   return data.SiparisTarihi || data.PlanlananTarih || data.OlusturmaTarihi || today;
 }
 
@@ -1683,7 +1685,7 @@ function getDashboard_() {
     totalTRY: Math.round(totalTRY * 100) / 100,
     totalRUB: Math.round(totalRUB * 100) / 100,
     warrantyExpiringSoon: warrantyExpiringSoon,
-    pendingNeeds: sheetToObjects_(SHEETS.IHTIYACLAR).filter(function(n) { return n.Durum === 'Bekleniyor'; }).length,
+    pendingNeeds: sheetToObjects_(SHEETS.IHTIYACLAR).filter(function(n) { return n.Durum === 'Bekleniyor' || n.Durum === 'Onaylandi'; }).length,
     lowStockCount: sheetToObjects_(SHEETS.SARF).filter(function(m) { return Number(m.Stok || 0) <= Number(m.MinStok || 0); }).length
   };
 }
@@ -2233,6 +2235,8 @@ function aggregatePayment_(rows) {
   const st = rows.map(function(r) { return r.OdemeDurumu || 'Odenmedi'; });
   let durum = 'KismenOdendi';
   if (st.length && st.every(function(x) { return x === 'Odendi'; })) durum = 'Odendi';
+  else if (st.length && st.every(function(x) { return x === 'TeklifFiyat'; })) durum = 'TeklifFiyat';
+  else if (st.every(function(x) { return x === 'TeklifFiyat' || x === 'Odenmedi'; })) durum = 'Odenmedi';
   else if (!st.length || st.every(function(x) { return x === 'Odenmedi'; })) durum = 'Odenmedi';
   const dates = rows
     .filter(function(r) { return (r.OdemeDurumu === 'Odendi' || r.OdemeDurumu === 'KismenOdendi') && r.OdemeTarihi; })
@@ -2401,7 +2405,7 @@ function deleteFatura_(id) {
 // Henuz faturaya baglanmamis, SIPARIS VERILMIS/KARSILANMIS satirlari ayni
 // Tedarikci + Siparis Tarihi'ne gore gruplar. Hicbir sey YAZMAZ - sadece oneri dondurur.
 function suggestFaturaGroups_() {
-  const okDurum = ['Siparis Verildi', 'Karsilandi'];
+  const okDurum = ['Siparis Verildi', 'Yolda', 'KismenAlindi', 'Karsilandi'];
   function eligible(r) { return okDurum.indexOf(r.Durum) !== -1 && !r.FaturaID && r.Tedarikci && r.SiparisTarihi; }
   const needs = sheetToObjects_(SHEETS.IHTIYACLAR).filter(eligible);
   const sarf = getSarfSiparisleri_().filter(eligible);

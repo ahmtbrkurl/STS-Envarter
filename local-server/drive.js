@@ -119,6 +119,8 @@ async function uploadFile(data) {
       const combined = existing ? existing + ', ' + url : url;
       const colLetter = sheets.columnLetter(col + 1);
       await client_updateCell(sheetName, `${colLetter}${rowIdx}`, combined);
+      // Okuma onbellegi (5 sn) eski linkleri dondurmesin - aksi halde liste/kayit eski veriyi gorur ve yeni belge "kaybolur".
+      sheets.invalidateCache(sheetName);
     }
   }
   return { url, message: 'Dosya yuklendi.' };

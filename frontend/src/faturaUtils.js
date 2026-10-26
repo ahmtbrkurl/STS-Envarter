@@ -2,11 +2,12 @@
 // ORTAK kullanilan kucuk yardimcilar - ayni mantik birden fazla dosyada
 // kopyalanmasin diye burada toplandi.
 
-// Backend'deki ODEME_DURUMU_OPTIONS ile ayni, 3 sabit secenek.
-export const ODEME_DURUMU_OPTIONS = ['Odenmedi', 'KismenOdendi', 'Odendi'];
+// Backend'deki ODEME_DURUMU_OPTIONS ile ayni sabit secenekler.
+export const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
 
 export function odemeDurumuLabel(key, lang) {
   const map = {
+    TeklifFiyat: { tr: 'Teklif Fiyat', ru: 'Ценовое предложение', en: 'Price Quote' },
     Odenmedi: { tr: 'Ödenmedi', ru: 'Не оплачено', en: 'Not Paid' },
     KismenOdendi: { tr: 'Kısmen Ödendi', ru: 'Частично оплачено', en: 'Partially Paid' },
     Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' }
@@ -17,6 +18,7 @@ export function odemeDurumuLabel(key, lang) {
 export function odemeBadgeClass(key) {
   if (key === 'Odendi') return 'badge-accent';
   if (key === 'KismenOdendi') return 'badge-amber';
+  if (key === 'TeklifFiyat') return 'badge-blue';
   return 'badge-gray';
 }
 

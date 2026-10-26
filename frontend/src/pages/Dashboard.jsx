@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { api } from '../api';
+import { PRE_ORDER, ORDERED_OPEN, OPEN_NEED } from '../needStatus.js';
 import { useLang, translateStatus, translateCategory } from '../i18n.jsx';
 
 const CURRENCY_SYMBOL = { TRY: '₺', USD: '$', EUR: '€', RUB: '₽' };
@@ -59,7 +60,7 @@ export default function Dashboard() {
     return { usd: inTRY / rates.USD, try: inTRY, rub: rates.RUB ? inTRY / rates.RUB : null };
   }
 
-  const hasNeedsBudget = needs.some((n) => (n.Durum === 'Bekleniyor' || n.Durum === 'Siparis Verildi') && n.Fiyat);
+  const hasNeedsBudget = needs.some((n) => OPEN_NEED.includes(n.Durum) && n.Fiyat);
 
   // Yakinda ise baslayacak (veya baslama tarihi gecmis ama hala BILGISAYARI
   // olmayan) kisileri buluyoruz - IT'nin onceden hazirlik yapabilmesi icin.
@@ -85,7 +86,7 @@ export default function Dashboard() {
       // Bu kisi icin zaten acik (henuz karsilanmamis) bir ihtiyac kaydi var mi -
       // varsa "ihtiyac listesine eklendi" rozetini gosterip tekrar ekle butonunu
       // gizliyoruz, karisikligi onlemek icin.
-      const hasOpenNeed = needs.some((n) => n.PersonelAdi === e.AdSoyad && (n.Durum === 'Bekleniyor' || n.Durum === 'Siparis Verildi'));
+      const hasOpenNeed = needs.some((n) => n.PersonelAdi === e.AdSoyad && OPEN_NEED.includes(n.Durum));
       if (!e.PlanlananBaslangicTarihi) return { ...e, diffDays: null, noDate: true, hasOpenNeed };
       const target = new Date(e.PlanlananBaslangicTarihi);
       if (isNaN(target.getTime())) return { ...e, diffDays: null, noDate: true, hasOpenNeed };
@@ -189,12 +190,12 @@ export default function Dashboard() {
     XLSX.writeFile(wb, `Eksik_STS-org-com_Email_${stamp}.xlsx`);
   }
 
-  const bekleyenBudget = convertToThreeCurrencies(needs.filter((n) => n.Durum === 'Bekleniyor'));
-  const siparisBudget = convertToThreeCurrencies(needs.filter((n) => n.Durum === 'Siparis Verildi'));
+  const bekleyenBudget = convertToThreeCurrencies(needs.filter((n) => PRE_ORDER.includes(n.Durum)));
+  const siparisBudget = convertToThreeCurrencies(needs.filter((n) => ORDERED_OPEN.includes(n.Durum)));
   // Siparis verilmis ama henuz (tam) odenmemis tutar - "siparis geldi ama fatura/odeme
   // sonra yapilacak" senaryosunu takip etmek icin ayri gosteriyoruz.
-  const odenmemisBudget = convertToThreeCurrencies(needs.filter((n) => n.Durum === 'Siparis Verildi' && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi'));
-  const hasOdenmemisBudget = needs.some((n) => n.Durum === 'Siparis Verildi' && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi' && n.Fiyat);
+  const odenmemisBudget = convertToThreeCurrencies(needs.filter((n) => ORDERED_OPEN.includes(n.Durum) && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi'));
+  const hasOdenmemisBudget = needs.some((n) => ORDERED_OPEN.includes(n.Durum) && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi' && n.Fiyat);
 
   const sarfLokasyonlar = [...new Set(sarf.map((m) => m.Lokasyon).filter(Boolean))];
   const filteredSarf = sarfLokasyonFilter ? sarf.filter((m) => m.Lokasyon === sarfLokasyonFilter) : sarf;

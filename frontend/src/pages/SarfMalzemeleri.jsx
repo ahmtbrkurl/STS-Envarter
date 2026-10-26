@@ -246,6 +246,7 @@ export default function SarfMalzemeleri() {
 
 function odemeDurumuLabel(key, lang) {
   const map = {
+    TeklifFiyat: { tr: 'Teklif Fiyat', ru: 'Ценовое предложение', en: 'Price Quote' },
     Odenmedi: { tr: 'Ödenmedi', ru: 'Не оплачено', en: 'Not Paid' },
     KismenOdendi: { tr: 'Kısmen Ödendi', ru: 'Частично оплачено', en: 'Partially Paid' },
     Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' }
@@ -270,7 +271,7 @@ function siparisDurumLabel(durum, t) {
   return map[durum] || durum;
 }
 
-const ODEME_DURUMU_OPTIONS = ['Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {

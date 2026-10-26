@@ -30,3 +30,16 @@ Temizlik: Faturalar sayfasinda/sheet'te hatali denemelerden kalan bos faturalari
 - Yonetim Raporu: "Goruntule" yerine 1.Fatura Link, 2.Fatura Link... ve 1.Teslim Form, 2.Teslim Form... kolonlari.
 - Calisanlar sheet'ine otomatik "TeslimFormLink" kolonu eklenir.
 - Apps Script: Code.gs'i yapistirip yeni surum yayinlayin (TESLIM_FORM_FOLDER_ID script ozelliginde tanimli olmali).
+
+=== 26.10.2026 ===
+- Odeme Durumu'na "Teklif Fiyat" eklendi (Faturalar + Ihtiyac Listesi).
+- Fatura belge yukleme: yuklenen belge artik listede hemen gorunur (okuma onbellegi temizleniyor).
+- Ihtiyac Listesi: "Planlanan Tarih" kolonu eklendi.
+- Apps Script: Code.gs'i yapistirip yeni surum yayinlayin.
+
+=== PLAN EXCEL (satin alma sablonu) ===
+- Tedarik Durumu 6 adim (Excel listesiyle birebir): Onay bekliyor, Onaylandi, Siparis verildi, Yolda, Kismen alindi, Tamamen alindi.
+  Ihtiyac duzenleme penceresinde "Tedarik Durumu" secimi, listede yeni sekmeler.
+- Plan Excel'inde durum kolonu artik sablonun acilir listesindeki metinlerle birebir yazilir.
+- Not kolonu: fatura/proforma linkleri "1.Fatura Link: ...", "2.Fatura Link: ..." seklinde ayri satirlarda.
+- Apps Script: Code.gs'i yapistirip yeni surum yayinlayin.

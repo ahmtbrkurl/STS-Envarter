@@ -112,7 +112,7 @@ export default function Calisanlar() {
     setSyncingForms(true);
     try {
       const r = await api.syncTeslimFormLinks();
-      alert(`${t('handover_sync_done')}: ${r.message}${r.unmatched && r.unmatched.length ? `\n(${r.unmatched.length} ?)` : ''}`);
+      alert(`${t('handover_sync_done')}: ${r.message}${r.unmatched && r.unmatched.length ? `\n(${r.unmatched.length} eslesmeyen dosya)` : ''}`);
       load();
     } catch (err) {
       alert(err.message);

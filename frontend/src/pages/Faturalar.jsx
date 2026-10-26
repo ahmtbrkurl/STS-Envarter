@@ -53,7 +53,7 @@ export default function Faturalar() {
   }, [needs, siparisler]);
 
   const counts = useMemo(() => {
-    const c = { Odenmedi: 0, KismenOdendi: 0, Odendi: 0 };
+    const c = { TeklifFiyat: 0, Odenmedi: 0, KismenOdendi: 0, Odendi: 0 };
     faturalar.forEach((f) => { c[f.OdemeDurumu || 'Odenmedi'] = (c[f.OdemeDurumu || 'Odenmedi'] || 0) + 1; });
     return c;
   }, [faturalar]);
@@ -186,6 +186,7 @@ export default function Faturalar() {
           lists={lists}
           onClose={() => setModal(null)}
           onSaved={handleSaved}
+          onDocsChanged={load}
         />
       )}
 
@@ -206,7 +207,7 @@ export default function Faturalar() {
 }
 
 // ============ Fatura olustur / duzenle ============
-function FaturaModal({ fatura, needs, siparisler, lists, onClose, onSaved }) {
+function FaturaModal({ fatura, needs, siparisler, lists, onClose, onSaved, onDocsChanged }) {
   const { t, lang } = useLang();
   const isNew = !fatura;
   const [form, setForm] = useState({
@@ -297,7 +298,7 @@ function FaturaModal({ fatura, needs, siparisler, lists, onClose, onSaved }) {
     setForm((f) => {
       const today = new Date().toISOString().slice(0, 10);
       let tarih = f.OdemeTarihi;
-      if (value === 'Odenmedi') tarih = '';
+      if (value === 'Odenmedi' || value === 'TeklifFiyat') tarih = '';
       else if (!tarih) tarih = today;
       return { ...f, OdemeDurumu: value, OdemeTarihi: tarih };
     });
@@ -332,6 +333,7 @@ function FaturaModal({ fatura, needs, siparisler, lists, onClose, onSaved }) {
       const base64 = await fileToBase64(file);
       const res = await api.uploadFile({ assetId: fatura.ID, filename: file.name, mimeType: file.type, base64, sheetName: 'Faturalar', linkColumn: 'BelgeLink' });
       setDocs((prev) => [...prev, res.url]);
+      if (onDocsChanged) onDocsChanged(); // liste de yeni belgeyi hemen gorsun
     } catch (err) {
       setUploadError(err.message);
     } finally {

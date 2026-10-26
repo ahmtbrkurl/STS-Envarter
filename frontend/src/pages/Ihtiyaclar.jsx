@@ -13,7 +13,8 @@ import {
 } from '../faturaUtils.js';
 
 const PAGE_SIZE = 10;
-const STATUS_TABS = ['Bekleniyor', 'Siparis Verildi', 'Karsilandi', 'Iptal', 'Hepsi'];
+import { PRE_ORDER, ORDERED_OPEN, OPEN_NEED, PLAN_STATUS_TEXT } from '../needStatus.js';
+const STATUS_TABS = ['Bekleniyor', 'Onaylandi', 'Siparis Verildi', 'Yolda', 'KismenAlindi', 'Karsilandi', 'Iptal', 'Hepsi'];
 
 // Aylik Satin Alma Plani ozelligi, satin alma sefinin GERCEK sablon dosyasini
 // (frontend/public/templates/plan_zakupok_sablon.xlsx) baz alir - sadece hucre
@@ -26,9 +27,7 @@ const PLAN_SHEET_NAME = 'План закупок';
 const PLAN_FIRST_DATA_ROW = 5;
 
 const DURUM_MAP = {
-  Bekleniyor: 'К оформлению / Onay alınacak',
-  'Siparis Verildi': 'Заказано / Onaylandı',
-  Karsilandi: 'Получено полностью / Tamamen alındı',
+  ...PLAN_STATUS_TEXT,
   Iptal: 'Отменено / İptal edildi',
   EnvanterFiyatsiz: 'Уже в наличии - цена неизвестна / Envanterde kayıtlı - fiyat bilinmiyor'
 };
@@ -36,6 +35,7 @@ const DURUM_MAP = {
 // Aylik Satin Alma Plani exportundaki Not (O) sutununa eklenecek odeme durumu
 // metni - ODEME_DURUMU_OPTIONS ile ayni 3 secenek, RU/TR birlikte.
 const ODEME_DURUMU_EXPORT_MAP = {
+  TeklifFiyat: 'Ценовое предложение / Teklif Fiyat',
   Odenmedi: 'Не оплачено / Ödenmedi',
   KismenOdendi: 'Частично оплачено / Kısmen ödendi',
   Odendi: 'Оплачено / Ödendi'
@@ -51,7 +51,7 @@ const NEED_HEADERS = ['ID', 'PersonelAdi', 'Departman', 'PlanlananTarih', 'Kateg
 function filterDateOf(n, basis) {
   let v;
   if (basis === 'auto') {
-    v = n.Durum === 'Bekleniyor'
+    v = PRE_ORDER.includes(n.Durum)
       ? (n.PlanlananTarih || n.OlusturmaTarihi)
       : (n.SiparisTarihi || n.PlanlananTarih || n.OlusturmaTarihi);
   } else v = n[basis];
@@ -264,7 +264,10 @@ export default function Ihtiyaclar() {
   const PDF_VIEWS = [
     { key: 'board', label: t('needs_missing_board_title') },
     { key: 'Bekleniyor', label: tabLabel('Bekleniyor', t) },
+    { key: 'Onaylandi', label: tabLabel('Onaylandi', t) },
     { key: 'Siparis Verildi', label: tabLabel('Siparis Verildi', t) },
+    { key: 'Yolda', label: tabLabel('Yolda', t) },
+    { key: 'KismenAlindi', label: tabLabel('KismenAlindi', t) },
     { key: 'Karsilandi', label: tabLabel('Karsilandi', t) },
     { key: 'Iptal', label: tabLabel('Iptal', t) },
     { key: 'Hepsi', label: tabLabel('Hepsi', t) }
@@ -282,7 +285,7 @@ export default function Ihtiyaclar() {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
       const stamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}_${pad(now.getHours())}-${pad(now.getMinutes())}`;
-      const nameMap = { board: 'Eksik_Ekipman_Panosu', Bekleniyor: 'Bekleyenler', 'Siparis Verildi': 'Siparis_Verildi', Karsilandi: 'Karsilananlar', Iptal: 'Iptal_Edilenler', Hepsi: 'Ihtiyac_Listesi' };
+      const nameMap = { board: 'Eksik_Ekipman_Panosu', Bekleniyor: 'Bekleyenler', Onaylandi: 'Onaylananlar', 'Siparis Verildi': 'Siparis_Verildi', Yolda: 'Yolda', KismenAlindi: 'Kismen_Alinanlar', Karsilandi: 'Karsilananlar', Iptal: 'Iptal_Edilenler', Hepsi: 'Ihtiyac_Listesi' };
       document.title = `${nameMap[mode] || 'Ihtiyac_Listesi'}_${lang.toUpperCase()}_${stamp}`;
       window.print();
       setTimeout(() => {
@@ -504,13 +507,14 @@ export default function Ihtiyaclar() {
             <table>
               <colgroup>
                 <col className="no-print" style={{ width: '3%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '9%' }} />
                 <col style={{ width: '11%' }} />
-                <col style={{ width: '19%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '17%' }} />
                 <col style={{ width: '9%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '18%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '16%' }} />
                 <col className="no-print" style={{ width: '4%' }} />
               </colgroup>
               <thead>
@@ -521,6 +525,7 @@ export default function Ihtiyaclar() {
                   <th>{t('needs_col_person')}</th>
                   <th>{t('col_department')}</th>
                   <th>{t('col_category')}</th>
+                  <th>{t('needs_col_planned_date')}</th>
                   <th>{t('col_notes')}</th>
                   <th>{t('col_price')}</th>
                   <th>{t('inv_col_invoice_payment')}</th>
@@ -537,6 +542,7 @@ export default function Ihtiyaclar() {
                     <td style={{ fontWeight: 600 }}>{n.PersonelAdi || `📦 ${t('needs_stock_label')}`}</td>
                     <td>{n.Departman || '—'}</td>
                     <td>{translateCategory(n.Kategori, lang)}</td>
+                    <td className="mono" style={{ whiteSpace: 'normal' }}>{n.PlanlananTarih || '—'}</td>
                     <td style={{ whiteSpace: 'normal' }}>{n.Aciklama || '—'}</td>
                     <td className="mono" style={{ whiteSpace: 'normal' }}>
                       {n.Fiyat ? `${n.Fiyat} ${n.ParaBirimi || ''}` : '—'}
@@ -560,7 +566,7 @@ export default function Ihtiyaclar() {
                     </td>
                     <td>
                       <span className={`badge ${statusClass(n.Durum)}`}>{tabLabel(n.Durum, t)}</span>
-                      {n.Durum === 'Siparis Verildi' && (n.KargoFirmasi || n.KargoTakipNo || n.TahminiTeslimatTarihi) && (
+                      {ORDERED_OPEN.includes(n.Durum) && (n.KargoFirmasi || n.KargoTakipNo || n.TahminiTeslimatTarihi) && (
                         <div className="page-sub" style={{ marginTop: 4, fontSize: 11, whiteSpace: 'normal', lineHeight: 1.5 }}>
                           {n.KargoFirmasi && <div>{n.KargoFirmasi}</div>}
                           {n.KargoTakipNo && <div className="mono">{n.KargoTakipNo}</div>}
@@ -571,13 +577,13 @@ export default function Ihtiyaclar() {
                     <td className="no-print" onClick={(e) => e.stopPropagation()} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {/* Duzenle HER durumda acik - Karsilandi/Iptal satirlarinda da odeme durumu, fatura ve belgeler guncellenebilsin. */}
                       <button className="btn btn-ghost btn-sm" onClick={() => setEditTarget(n)}>{t('needs_edit')}</button>
-                      {n.Durum === 'Bekleniyor' && (
+                      {PRE_ORDER.includes(n.Durum) && (
                         <button className="btn btn-ghost btn-sm" onClick={() => markOrdered(n)}>{t('needs_mark_ordered')}</button>
                       )}
-                      {(n.Durum === 'Bekleniyor' || n.Durum === 'Siparis Verildi') && (
+                      {OPEN_NEED.includes(n.Durum) && (
                         <button className="btn btn-ghost btn-sm" onClick={() => setFulfillTarget(n)}>{t('needs_mark_fulfilled')}</button>
                       )}
-                      {(n.Durum === 'Bekleniyor' || n.Durum === 'Siparis Verildi') && (
+                      {OPEN_NEED.includes(n.Durum) && (
                         <button className="btn btn-danger btn-sm" onClick={() => cancelNeed(n)}>{t('needs_cancel')}</button>
                       )}
                       {n.Durum === 'Karsilandi' && n.BaglantiliVarlikID && (
@@ -587,7 +593,7 @@ export default function Ihtiyaclar() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={9}><div className="empty-state">{t('no_results')}</div></td></tr>
+                  <tr><td colSpan={10}><div className="empty-state">{t('no_results')}</div></td></tr>
                 )}
               </tbody>
             </table>
@@ -669,7 +675,8 @@ export default function Ihtiyaclar() {
 
 function statusClass(durum) {
   if (durum === 'Karsilandi') return 'badge-accent';
-  if (durum === 'Siparis Verildi') return 'badge-amber';
+  if (durum === 'Onaylandi') return 'badge-blue';
+  if (ORDERED_OPEN.includes(durum)) return 'badge-amber';
   if (durum === 'Iptal') return 'badge-red';
   return 'badge-gray';
 }
@@ -677,7 +684,10 @@ function statusClass(durum) {
 function tabLabel(s, t) {
   const map = {
     'Bekleniyor': t('needs_pending'),
+    'Onaylandi': t('needs_approved'),
     'Siparis Verildi': t('needs_ordered'),
+    'Yolda': t('needs_in_transit'),
+    'KismenAlindi': t('needs_partial'),
     'Karsilandi': t('needs_fulfilled'),
     'Iptal': t('needs_cancelled'),
     'Hepsi': t('needs_all')
@@ -971,7 +981,8 @@ function NeedEditModal({ need, lists, employees, faturalar, onClose, onSaved }) 
     KargoFirmasi: need.KargoFirmasi || '',
     KargoTakipNo: need.KargoTakipNo || '',
     OdemeDurumu: need.OdemeDurumu || 'Odenmedi',
-    OdemeTarihi: need.OdemeTarihi || ''
+    OdemeTarihi: need.OdemeTarihi || '',
+    Durum: need.Durum
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -1076,6 +1087,8 @@ function NeedEditModal({ need, lists, employees, faturalar, onClose, onSaved }) 
         const finalDepartman = personMode === 'stock' ? '' : (selectedEmployee?.Departman || form.Departman);
         payload = { ...form, PersonelAdi: finalPersonelAdi, Departman: finalDepartman };
       }
+      // Siparis verilmis adimlara (Siparis Verildi/Yolda/Kismen alindi) ilk kez gecilirken siparis tarihi bossa bugunu yaz.
+      if (payload.Durum && ORDERED_OPEN.includes(payload.Durum) && !need.SiparisTarihi) payload.SiparisTarihi = new Date().toISOString().slice(0, 10);
       // Faturaya bagli satirda odeme bilgisini fatura belirler - gondermiyoruz.
       if (faturaId) { delete payload.OdemeDurumu; delete payload.OdemeTarihi; }
       await api.updateNeed(need.ID, payload);
@@ -1105,6 +1118,12 @@ function NeedEditModal({ need, lists, employees, faturalar, onClose, onSaved }) 
           </div>
         )}
         {!limited && (<>
+        <div className="field">
+          <label>{t('needs_supply_status')}</label>
+          <select value={form.Durum} onChange={(e) => setForm({ ...form, Durum: e.target.value })}>
+            {['Bekleniyor', 'Onaylandi', 'Siparis Verildi', 'Yolda', 'KismenAlindi'].map((k) => <option key={k} value={k}>{tabLabel(k, t)}</option>)}
+          </select>
+        </div>
         <div className="chip-row">
           <button type="button" className={`badge ${personMode === 'existing' ? 'badge-accent' : 'badge-gray'}`} onClick={() => setPersonMode('existing')} style={{ cursor: 'pointer' }}>
             {t('needs_existing_employee')}
@@ -1314,7 +1333,7 @@ function LinkToFaturaModal({ rows, faturalar, onClose, onDone }) {
   function setPaymentStatus(value) {
     setForm((f) => {
       let tarih = f.OdemeTarihi;
-      if (value === 'Odenmedi') tarih = '';
+      if (value === 'Odenmedi' || value === 'TeklifFiyat') tarih = '';
       else if (!tarih) tarih = new Date().toISOString().slice(0, 10);
       return { ...f, OdemeDurumu: value, OdemeTarihi: tarih };
     });
@@ -1539,7 +1558,7 @@ export function MonthlyPlanExportModal({ needs, items, faturalar, onClose, fatur
       // (zaten siparis edilmis) icin Siparis Tarihi (gercek islem tarihi ve o
       // gunku gercek odeme kuru).
       function rateDateFor(n) {
-        return n.Durum === 'Bekleniyor'
+        return PRE_ORDER.includes(n.Durum)
           ? (n.PlanlananTarih || n.OlusturmaTarihi || '')
           : (n.SiparisTarihi || n.PlanlananTarih || n.OlusturmaTarihi || '');
       }
@@ -1563,7 +1582,7 @@ export function MonthlyPlanExportModal({ needs, items, faturalar, onClose, fatur
         // Sadece AYNI KAYIT ISLEMINDE (TopluID ayni) eklenen ayni kalemler birlestirilir;
         // ayri ayri eklenen kayitlar (TopluID farkli/yok) kendi satirinda kalir.
         const key = n.TopluID
-          ? [n.TopluID, n.Kategori, ad, n.Birim, n.Fiyat, n.ParaBirimi, tarih, n.FaturaID || ''].join('|')
+          ? [n.TopluID, n.Kategori, ad, n.Birim, n.Fiyat, n.ParaBirimi, tarih, n.FaturaID || '', n.Durum].join('|')
           : n.ID;
         if (!grouped[key]) grouped[key] = { ...n, Ad: ad, Miktar: 0, RateDate: tarih };
         grouped[key].Miktar += 1;
@@ -1682,8 +1701,12 @@ export function MonthlyPlanExportModal({ needs, items, faturalar, onClose, fatur
         if (bagliFatura) notParts.push(`Счёт / Fatura: ${faturaLabel(bagliFatura)}`);
         // Bagli faturanin belgeleri + satirin kendi proforma/fatura belgeleri (tekrarsiz).
         const links = effectiveDocs(r, faturaMap);
-        if (links.length) notParts.push(links.join(' | '));
-        ws.getCell(`O${rowNum}`).value = notParts.join(' / ');
+        // Linkler numarali ve her biri ayri satirda: "1.Fatura Link: https://...".
+        let notText = notParts.join(' / ');
+        if (links.length) notText += (notText ? '\n' : '') + links.map((u, li) => `${li + 1}.Fatura Link: ${u}`).join('\n');
+        const noteCell = ws.getCell(`O${rowNum}`);
+        noteCell.value = notText;
+        noteCell.alignment = { ...(noteCell.alignment || {}), wrapText: true, vertical: 'top' };
       });
 
       // Kullanilan kurlari (birden fazla tarih olabilir), kaynagiyla birlikte
@@ -1788,7 +1811,10 @@ export function MonthlyPlanExportModal({ needs, items, faturalar, onClose, fatur
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[
             { key: 'Bekleniyor', label: t('needs_pending') },
+            { key: 'Onaylandi', label: t('needs_approved') },
             { key: 'Siparis Verildi', label: t('needs_ordered') },
+            { key: 'Yolda', label: t('needs_in_transit') },
+            { key: 'KismenAlindi', label: t('needs_partial') },
             { key: 'Karsilandi', label: t('needs_fulfilled') }
           ].map((d) => (
             <button
