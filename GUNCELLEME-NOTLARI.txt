@@ -43,3 +43,10 @@ Temizlik: Faturalar sayfasinda/sheet'te hatali denemelerden kalan bos faturalari
 - Plan Excel'inde durum kolonu artik sablonun acilir listesindeki metinlerle birebir yazilir.
 - Not kolonu: fatura/proforma linkleri "1.Fatura Link: ...", "2.Fatura Link: ..." seklinde ayri satirlarda.
 - Apps Script: Code.gs'i yapistirip yeni surum yayinlayin.
+
+=== Ihtiyac "Karsilandi" -> Sarf malzeme ===
+- Karsilandi penceresine 3. secenek: "Sarf Malzeme Stoguna Ekle" (orn. kartus). Mevcut sarf malzemeyi listeden secerseniz stoguna +1, yeni ad yazarsaniz yeni sarf malzeme olusur.
+- Apps Script: Code.gs'i yapistirip yeni surum yayinlayin.
+
+=== Eksik Ekipman Panosu ===
+- Acik ihtiyaci olan kisinin yaninda "✓ Ihtiyac listesine eklendi" isareti gosterilir.

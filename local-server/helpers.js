@@ -1082,9 +1082,13 @@ async function fulfillNeedAsNewAsset(needId, user) {
   return { message: `Yeni varlik (${created.id}) olusturuldu` + (forStock ? ' ve stoga eklendi.' : ` ve ${need.PersonelAdi} kisisine atandi.`), assetId: created.id };
 }
 
-async function fulfillNeedAsSarfStock(needId, user) {
+// ad (opsiyonel): ihtiyacin MalzemeAdi'si yoksa (orn. "kartus" normal ihtiyac olarak girildiyse)
+// kullanicinin sectigi/yazdigi sarf malzeme adi.
+async function fulfillNeedAsSarfStock(needId, user, ad) {
   const need = await getNeed(needId);
-  if (!need.MalzemeAdi) throw new Error('Bu ihtiyacin bir Sarf Malzemesi adi yok.');
+  const sarfAd = String(ad || need.MalzemeAdi || '').trim();
+  if (!sarfAd) throw new Error('Sarf Malzemesi adi gerekli.');
+  need.MalzemeAdi = sarfAd;
   const existing = (await sheets.sheetToObjects(SHEET_NAMES.SARF)).find((m) => m.Ad === need.MalzemeAdi);
   let malzemeId;
   if (existing) {

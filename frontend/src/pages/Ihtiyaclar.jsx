@@ -406,9 +406,14 @@ export default function Ihtiyaclar() {
                 <div className="page-sub">{t('needs_missing_none')}</div>
               ) : (
                 <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                  {board.missing.map((e) => (
+                  {board.missing.map((e) => {
+                    // Bu kisi icin bu gruptan (bilgisayar/monitor) zaten ACIK bir ihtiyac kaydi var mi?
+                    const hasOpenNeed = needs.some((n) => n.PersonelAdi === e.AdSoyad && OPEN_NEED.includes(n.Durum) && board.kategoriler.includes(n.Kategori));
+                    return (
                     <div key={e.AdSoyad} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderBottom: '1px solid var(--border)', fontSize: 12.5 }}>
-                      <span>{e.AdSoyad}{e.Departman ? <span className="page-sub"> · {e.Departman}</span> : null}</span>
+                      <span>{e.AdSoyad}{e.Departman ? <span className="page-sub"> · {e.Departman}</span> : null}
+                        {hasOpenNeed && <span style={{ color: 'var(--accent)', marginLeft: 6 }}>· ✓ {t('dash_already_in_needs_list')}</span>}
+                      </span>
                       <button
                         className="btn btn-ghost btn-sm no-print"
                         onClick={() => setQuickAddFor({ person: e.AdSoyad, kategori: board.kategoriler[0] })}
@@ -416,7 +421,8 @@ export default function Ihtiyaclar() {
                         + {t('needs_new')}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1443,6 +1449,13 @@ function FulfillModal({ need, items, userName, onClose, onDone }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const isSarfMalzeme = !!need.MalzemeAdi;
+  // Normal ihtiyac olarak girilmis sarf kalemleri (orn. kartus) icin 3. secenek: sarf stoguna ekle.
+  const [sarfAd, setSarfAd] = useState([need.Marka, need.Aciklama].filter(Boolean).join(' ').trim());
+  const [sarfNames, setSarfNames] = useState([]);
+  useEffect(() => {
+    if (isSarfMalzeme) return;
+    api.getSarfMalzemeleri().then((list) => setSarfNames((list || []).map((m) => m.Ad).filter(Boolean))).catch(() => {});
+  }, [isSarfMalzeme]);
 
   async function handleConfirm() {
     setSaving(true);
@@ -1450,9 +1463,11 @@ function FulfillModal({ need, items, userName, onClose, onDone }) {
     try {
       const res = isSarfMalzeme
         ? await api.fulfillNeedAsSarfStock(need.ID, userName)
-        : mode === 'existing'
-          ? await api.fulfillNeed(need.ID, assetId, userName)
-          : await api.fulfillNeedAsNewAsset(need.ID, userName);
+        : mode === 'sarf'
+          ? await api.fulfillNeedAsSarfStock(need.ID, userName, sarfAd.trim())
+          : mode === 'existing'
+            ? await api.fulfillNeed(need.ID, assetId, userName)
+            : await api.fulfillNeedAsNewAsset(need.ID, userName);
       alert(res.message);
       onDone();
     } catch (err) {
@@ -1487,7 +1502,7 @@ function FulfillModal({ need, items, userName, onClose, onDone }) {
       actions={
         <>
           <button className="btn btn-ghost" onClick={onClose}>{t('btn_cancel')}</button>
-          <button className="btn btn-primary" onClick={handleConfirm} disabled={saving || (mode === 'existing' && !assetId)}>
+          <button className="btn btn-primary" onClick={handleConfirm} disabled={saving || (mode === 'existing' && !assetId) || (mode === 'sarf' && !sarfAd.trim())}>
             {saving ? '...' : t('btn_confirm')}
           </button>
         </>
@@ -1500,9 +1515,21 @@ function FulfillModal({ need, items, userName, onClose, onDone }) {
         <button type="button" className={`badge ${mode === 'new' ? 'badge-accent' : 'badge-gray'}`} onClick={() => setMode('new')} style={{ cursor: 'pointer' }}>
           {t('needs_fulfill_new')}
         </button>
+        <button type="button" className={`badge ${mode === 'sarf' ? 'badge-accent' : 'badge-gray'}`} onClick={() => setMode('sarf')} style={{ cursor: 'pointer' }}>
+          {t('needs_fulfill_as_sarf')}
+        </button>
       </div>
 
-      {mode === 'existing' ? (
+      {mode === 'sarf' ? (
+        <div className="field">
+          <label>{t('needs_fulfill_sarf_name')}</label>
+          <input list="fulfill-sarf-names" value={sarfAd} onChange={(e) => setSarfAd(e.target.value)} />
+          <datalist id="fulfill-sarf-names">
+            {sarfNames.map((n) => <option key={n} value={n} />)}
+          </datalist>
+          <div className="page-sub" style={{ marginTop: 4 }}>{t('needs_fulfill_sarf_hint')}</div>
+        </div>
+      ) : mode === 'existing' ? (
         candidates.length === 0 ? (
           <div className="empty-state">Bu kategoride stokta uygun varlik yok. "{t('needs_fulfill_new')}" secenegini kullanin.</div>
         ) : (

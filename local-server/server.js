@@ -223,7 +223,7 @@ app.post('/', async (req, res) => {
       case 'fulfillNeedAsNewAsset':
         return jsonOut(res, await helpers.fulfillNeedAsNewAsset(id, user));
       case 'fulfillNeedAsSarfStock':
-        return jsonOut(res, await helpers.fulfillNeedAsSarfStock(id, user));
+        return jsonOut(res, await helpers.fulfillNeedAsSarfStock(id, user, data && data.ad));
       case 'createSarfMalzeme':
         return jsonOut(res, await helpers.createSarfMalzeme(data));
       case 'updateSarfMalzeme':

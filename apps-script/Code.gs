@@ -496,7 +496,7 @@ function doPost(e) {
       case 'fulfillNeedAsNewAsset':
         return jsonOut_(fulfillNeedAsNewAsset_(body.id, body.user));
       case 'fulfillNeedAsSarfStock':
-        return jsonOut_(fulfillNeedAsSarfStock_(body.id, body.user));
+        return jsonOut_(fulfillNeedAsSarfStock_(body.id, body.user, body.data && body.data.ad));
       case 'importNeeds':
         return jsonOut_(importNeeds_(body.data.rows));
       case 'applyHRSync':
@@ -1297,9 +1297,11 @@ function fulfillNeedAsNewAsset_(needId, user) {
 // yeni bir Envanter varligi OLUSTURMAZ - bunun yerine ilgili sarf malzemesinin
 // stoguna 1 adet ekler (malzeme sistemde yoksa, Ihtiyac'taki fiyat/tedarikci
 // bilgisiyle otomatik olusturur). Boylece fiyat/tedarikci iki yerde tekrar girilmez.
-function fulfillNeedAsSarfStock_(needId, user) {
+function fulfillNeedAsSarfStock_(needId, user, ad) {
   const need = getNeed_(needId);
-  if (!need.MalzemeAdi) throw new Error('Bu ihtiyacin bir Sarf Malzemesi adi yok.');
+  const sarfAd = String(ad || need.MalzemeAdi || '').trim();
+  if (!sarfAd) throw new Error('Sarf Malzemesi adi gerekli.');
+  need.MalzemeAdi = sarfAd;
 
   const existing = sheetToObjects_(SHEETS.SARF).find(function(m) { return m.Ad === need.MalzemeAdi; });
   let malzemeId;
