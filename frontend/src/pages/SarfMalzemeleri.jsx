@@ -137,7 +137,7 @@ export default function SarfMalzemeleri() {
                     {s.Fiyat ? `${s.Fiyat} ${s.ParaBirimi || ''}` : '—'}
                     {s.Fiyat && (
                       <div style={{ marginTop: 4 }}>
-                        <span className={`badge ${s.OdemeDurumu === 'Odendi' ? 'badge-accent' : s.OdemeDurumu === 'KismenOdendi' ? 'badge-amber' : 'badge-gray'}`} style={{ fontSize: 10 }}>
+                        <span className={`badge ${s.OdemeDurumu === 'Odendi' ? 'badge-accent' : s.OdemeDurumu === 'KismenOdendi' ? 'badge-amber' : s.OdemeDurumu === 'TeklifFiyat' ? 'badge-blue' : s.OdemeDurumu === 'Iade' ? 'badge-purple' : s.OdemeDurumu === 'Iptal' ? 'badge-gray' : 'badge-red'}`} style={{ fontSize: 10 }}>
                           {odemeDurumuLabel(s.OdemeDurumu || 'Odenmedi', lang)}
                         </span>
                       </div>
@@ -249,7 +249,9 @@ function odemeDurumuLabel(key, lang) {
     TeklifFiyat: { tr: 'Teklif Fiyat', ru: 'Ценовое предложение', en: 'Price Quote' },
     Odenmedi: { tr: 'Ödenmedi', ru: 'Не оплачено', en: 'Not Paid' },
     KismenOdendi: { tr: 'Kısmen Ödendi', ru: 'Частично оплачено', en: 'Partially Paid' },
-    Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' }
+    Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' },
+    Iade: { tr: 'İade', ru: 'Возврат', en: 'Refunded' },
+    Iptal: { tr: 'İptal', ru: 'Отменено', en: 'Cancelled' }
   };
   return map[key]?.[lang] || map[key]?.tr || key;
 }
@@ -271,7 +273,7 @@ function siparisDurumLabel(durum, t) {
   return map[durum] || durum;
 }
 
-const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi', 'Iade', 'Iptal'];
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {

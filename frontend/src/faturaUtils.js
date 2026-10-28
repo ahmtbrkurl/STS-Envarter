@@ -3,14 +3,16 @@
 // kopyalanmasin diye burada toplandi.
 
 // Backend'deki ODEME_DURUMU_OPTIONS ile ayni sabit secenekler.
-export const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
+export const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi', 'Iade', 'Iptal'];
 
 export function odemeDurumuLabel(key, lang) {
   const map = {
     TeklifFiyat: { tr: 'Teklif Fiyat', ru: 'Ценовое предложение', en: 'Price Quote' },
     Odenmedi: { tr: 'Ödenmedi', ru: 'Не оплачено', en: 'Not Paid' },
     KismenOdendi: { tr: 'Kısmen Ödendi', ru: 'Частично оплачено', en: 'Partially Paid' },
-    Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' }
+    Odendi: { tr: 'Ödendi', ru: 'Оплачено', en: 'Paid' },
+    Iade: { tr: 'İade', ru: 'Возврат', en: 'Refunded' },
+    Iptal: { tr: 'İptal', ru: 'Отменено', en: 'Cancelled' }
   };
   return map[key]?.[lang] || map[key]?.tr || key;
 }
@@ -19,7 +21,9 @@ export function odemeBadgeClass(key) {
   if (key === 'Odendi') return 'badge-accent';
   if (key === 'KismenOdendi') return 'badge-amber';
   if (key === 'TeklifFiyat') return 'badge-blue';
-  return 'badge-gray';
+  if (key === 'Iade') return 'badge-purple';
+  if (key === 'Iptal') return 'badge-gray';
+  return 'badge-red'; // Odenmedi (ve bilinmeyen) = kirmizi
 }
 
 export function fileToBase64(file) {

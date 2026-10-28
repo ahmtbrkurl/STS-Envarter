@@ -63,7 +63,7 @@ const IHTIYAC_HEADERS = [
   'OdemeDurumu', 'OdemeTarihi', 'ProformaLink', 'FaturaID', 'TopluID'
 ];
 // helpers.js'deki ODEME_DURUMU_OPTIONS ile ayni - 3 sabit secenek.
-const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi', 'Iade', 'Iptal'];
 
 const GUNLUK_HEADERS = ['Tarih', 'Kullanici', 'Islem', 'Detay'];
 
@@ -2234,9 +2234,13 @@ function mergeLinks_(lists) {
 
 // Birden fazla satirin odeme durumundan tek bir ozet cikarir (otomatik gruplama).
 function aggregatePayment_(rows) {
-  const st = rows.map(function(r) { return r.OdemeDurumu || 'Odenmedi'; });
+  const all = rows.map(function(r) { return r.OdemeDurumu || 'Odenmedi'; });
+  // Iptal edilmis satirlar ozeti etkilemez (hepsi iptalse ozet de Iptal).
+  const st = all.filter(function(x) { return x !== 'Iptal'; });
   let durum = 'KismenOdendi';
-  if (st.length && st.every(function(x) { return x === 'Odendi'; })) durum = 'Odendi';
+  if (all.length && !st.length) durum = 'Iptal';
+  else if (st.every(function(x) { return x === 'Iade'; })) durum = 'Iade';
+  else if (st.length && st.every(function(x) { return x === 'Odendi'; })) durum = 'Odendi';
   else if (st.length && st.every(function(x) { return x === 'TeklifFiyat'; })) durum = 'TeklifFiyat';
   else if (st.every(function(x) { return x === 'TeklifFiyat' || x === 'Odenmedi'; })) durum = 'Odenmedi';
   else if (!st.length || st.every(function(x) { return x === 'Odenmedi'; })) durum = 'Odenmedi';

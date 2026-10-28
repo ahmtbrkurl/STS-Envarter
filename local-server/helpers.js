@@ -103,7 +103,7 @@ const IHTIYAC_HEADERS = [
 // Odeme durumu icin 3 sabit secenek - Listeler sheet'ine bagli degil,
 // Durum/DURUM_MAP gibi kodda sabit tutuluyor (kullaniciya ekstra kurulum
 // yaptirmamak icin).
-const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi'];
+const ODEME_DURUMU_OPTIONS = ['TeklifFiyat', 'Odenmedi', 'KismenOdendi', 'Odendi', 'Iade', 'Iptal'];
 const GUNLUK_HEADERS = ['Tarih', 'Kullanici', 'Islem', 'Detay'];
 const CLEAR_ASSIGNEE_STATUSES = ['Stok', 'Hurda', 'Elden Cikarildi', 'Kayip'];
 const SARF_HEADERS = ['ID', 'Ad', 'Kategori', 'UyumluModeller', 'Stok', 'MinStok', 'Birim', 'Lokasyon', 'Tedarikci', 'BirimFiyat', 'ParaBirimi', 'Notlar', 'OlusturmaTarihi', 'SonGuncelleme'];
@@ -826,9 +826,13 @@ function mergeLinks(lists) {
 // gruplamada fatura baslangic durumu icin): hepsi Odendi -> Odendi, hepsi
 // Odenmedi -> Odenmedi, karisiksa KismenOdendi.
 function aggregatePayment(rows) {
-  const st = rows.map((r) => r.OdemeDurumu || 'Odenmedi');
+  const all = rows.map((r) => r.OdemeDurumu || 'Odenmedi');
+  // Iptal edilmis satirlar ozeti etkilemez (hepsi iptalse ozet de Iptal).
+  const st = all.filter((s) => s !== 'Iptal');
   let durum = 'KismenOdendi';
-  if (st.length && st.every((s) => s === 'Odendi')) durum = 'Odendi';
+  if (all.length && !st.length) durum = 'Iptal';
+  else if (st.every((s) => s === 'Iade')) durum = 'Iade';
+  else if (st.length && st.every((s) => s === 'Odendi')) durum = 'Odendi';
   else if (st.length && st.every((s) => s === 'TeklifFiyat')) durum = 'TeklifFiyat';
   else if (st.every((s) => s === 'TeklifFiyat' || s === 'Odenmedi')) durum = 'Odenmedi';
   else if (!st.length || st.every((s) => s === 'Odenmedi')) durum = 'Odenmedi';

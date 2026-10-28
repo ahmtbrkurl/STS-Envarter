@@ -194,8 +194,8 @@ export default function Dashboard() {
   const siparisBudget = convertToThreeCurrencies(needs.filter((n) => ORDERED_OPEN.includes(n.Durum)));
   // Siparis verilmis ama henuz (tam) odenmemis tutar - "siparis geldi ama fatura/odeme
   // sonra yapilacak" senaryosunu takip etmek icin ayri gosteriyoruz.
-  const odenmemisBudget = convertToThreeCurrencies(needs.filter((n) => ORDERED_OPEN.includes(n.Durum) && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi'));
-  const hasOdenmemisBudget = needs.some((n) => ORDERED_OPEN.includes(n.Durum) && (n.OdemeDurumu || 'Odenmedi') !== 'Odendi' && n.Fiyat);
+  const odenmemisBudget = convertToThreeCurrencies(needs.filter((n) => ORDERED_OPEN.includes(n.Durum) && !['Odendi', 'Iptal', 'Iade', 'TeklifFiyat'].includes(n.OdemeDurumu || 'Odenmedi')));
+  const hasOdenmemisBudget = needs.some((n) => ORDERED_OPEN.includes(n.Durum) && !['Odendi', 'Iptal', 'Iade', 'TeklifFiyat'].includes(n.OdemeDurumu || 'Odenmedi') && n.Fiyat);
 
   const sarfLokasyonlar = [...new Set(sarf.map((m) => m.Lokasyon).filter(Boolean))];
   const filteredSarf = sarfLokasyonFilter ? sarf.filter((m) => m.Lokasyon === sarfLokasyonFilter) : sarf;

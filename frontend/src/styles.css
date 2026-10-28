@@ -353,6 +353,7 @@ tbody tr:hover { background: var(--bg); cursor: pointer; }
 .badge-amber { background: var(--amber-soft); color: var(--amber); }
 .badge-red { background: var(--red-soft); color: var(--red); }
 .badge-blue { background: #e0ecff; color: #1d4ed8; }
+.badge-purple { background: #efe7ff; color: #6d28d9; }
 .badge-gray { background: var(--gray-soft); color: var(--gray); }
 
 /* ===== Toolbar / filters ===== */

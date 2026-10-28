@@ -50,3 +50,8 @@ Temizlik: Faturalar sayfasinda/sheet'te hatali denemelerden kalan bos faturalari
 
 === Eksik Ekipman Panosu ===
 - Acik ihtiyaci olan kisinin yaninda "✓ Ihtiyac listesine eklendi" isareti gosterilir.
+
+=== Odeme Durumu ===
+- Odenmedi artik kirmizi; yeni durumlar: Iade, Iptal (Faturalar, Ihtiyac Listesi, Sarf).
+- Iptal/Iade/Teklif Fiyat "odenmemis tutar" Panel kartina dahil edilmez.
+- Apps Script: Code.gs'i yapistirip yeni surum yayinlayin.

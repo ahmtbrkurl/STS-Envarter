@@ -38,7 +38,9 @@ const ODEME_DURUMU_EXPORT_MAP = {
   TeklifFiyat: 'Ценовое предложение / Teklif Fiyat',
   Odenmedi: 'Не оплачено / Ödenmedi',
   KismenOdendi: 'Частично оплачено / Kısmen ödendi',
-  Odendi: 'Оплачено / Ödendi'
+  Odendi: 'Оплачено / Ödendi',
+  Iade: 'Возврат / İade',
+  Iptal: 'Отменено / İptal'
 };
 
 const MONTH_NAMES_TR = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
@@ -1339,7 +1341,7 @@ function LinkToFaturaModal({ rows, faturalar, onClose, onDone }) {
   function setPaymentStatus(value) {
     setForm((f) => {
       let tarih = f.OdemeTarihi;
-      if (value === 'Odenmedi' || value === 'TeklifFiyat') tarih = '';
+      if (value === 'Odenmedi' || value === 'TeklifFiyat' || value === 'Iptal') tarih = '';
       else if (!tarih) tarih = new Date().toISOString().slice(0, 10);
       return { ...f, OdemeDurumu: value, OdemeTarihi: tarih };
     });

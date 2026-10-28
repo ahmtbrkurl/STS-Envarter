@@ -53,7 +53,7 @@ export default function Faturalar() {
   }, [needs, siparisler]);
 
   const counts = useMemo(() => {
-    const c = { TeklifFiyat: 0, Odenmedi: 0, KismenOdendi: 0, Odendi: 0 };
+    const c = { TeklifFiyat: 0, Odenmedi: 0, KismenOdendi: 0, Odendi: 0, Iade: 0, Iptal: 0 };
     faturalar.forEach((f) => { c[f.OdemeDurumu || 'Odenmedi'] = (c[f.OdemeDurumu || 'Odenmedi'] || 0) + 1; });
     return c;
   }, [faturalar]);
@@ -96,7 +96,7 @@ export default function Faturalar() {
         {ODEME_DURUMU_OPTIONS.map((k) => (
           <div key={k} className="stat-card">
             <div className="label">{odemeDurumuLabel(k, lang)}</div>
-            <div className="value">{counts[k] || 0}</div>
+            <div className="value" style={k === 'Odenmedi' && (counts[k] || 0) > 0 ? { color: 'var(--red)' } : undefined}>{counts[k] || 0}</div>
           </div>
         ))}
       </div>
@@ -298,7 +298,7 @@ function FaturaModal({ fatura, needs, siparisler, lists, onClose, onSaved, onDoc
     setForm((f) => {
       const today = new Date().toISOString().slice(0, 10);
       let tarih = f.OdemeTarihi;
-      if (value === 'Odenmedi' || value === 'TeklifFiyat') tarih = '';
+      if (value === 'Odenmedi' || value === 'TeklifFiyat' || value === 'Iptal') tarih = '';
       else if (!tarih) tarih = today;
       return { ...f, OdemeDurumu: value, OdemeTarihi: tarih };
     });
