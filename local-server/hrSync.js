@@ -29,10 +29,29 @@ function findCol(headers, substr) {
   const target = normalizeForSearch(substr);
   const idx = headers.findIndex((h) => normalizeForSearch(h).includes(target));
   if (idx === -1) {
-    const preview = headers.slice(0, 6).map((h) => `"${h}"`).join(', ');
-    throw new Error(`HR Master Log'da "${substr}" iceren bir sutun bulunamadi. Okunan ilk basliklar: ${preview}${headers.length > 6 ? '...' : ''} (toplam ${headers.length} sutun)`);
+    // Tum basliklari gosteriyoruz ki hangi sutunun adinin degistigi tek bakista anlasilsin.
+    const all = headers.map((h, i) => `${i + 1}:"${normalizeForSearch(h)}"`).join(', ');
+    throw new Error(`HR Master Log'da "${substr}" iceren bir sutun bulunamadi. Tum basliklar (${headers.length} sutun): ${all}`);
   }
   return idx;
+}
+
+// Aksan/Turkce harf farkini yok sayan esleme (U/Ü, ı/i, ş/s ...) - "Unvan" basligi
+// HR dosyasinda "Ünvan" ya da farkli dil etiketiyle yazilabiliyor.
+function foldForSearch(s) {
+  return normalizeForSearch(s).toLowerCase()
+    .replace(/[üÜ]/g, 'u').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o')
+    .replace(/[şŞ]/g, 's').replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g');
+}
+// Unvan sutunu: lang 'tr' veya 'ru'. Bulunamazsa -1 doner (zorunlu degil - senkron unvansiz da calisir).
+function findUnvanCol(headers, lang) {
+  const isRu = (f) => f.indexOf('rusca') !== -1 || f.indexOf('рус') !== -1 || f.indexOf('(ru') !== -1;
+  const isTr = (f) => f.indexOf('turkce') !== -1 || f.indexOf('тур') !== -1 || f.indexOf('(tr') !== -1;
+  const cand = headers.map((h, i) => ({ i, f: foldForSearch(h) }))
+    .filter((x) => x.f.indexOf('unvan') !== -1 || x.f.indexOf('должност') !== -1 || x.f.indexOf('gorev') !== -1);
+  const pick = cand.find((x) => (lang === 'ru' ? isRu(x.f) : isTr(x.f)))
+    || (lang === 'tr' ? cand.find((x) => !isRu(x.f)) : cand.find((x) => isRu(x.f)));
+  return pick ? pick.i : -1;
 }
 
 function buildColMap(headers) {
@@ -44,8 +63,8 @@ function buildColMap(headers) {
     AD_RU: findCol(headers, 'Adı(Rusça)'),
     BABA_ADI: findCol(headers, 'Baba ad'),
     YAKA: findCol(headers, 'Yaka'),
-    UNVAN_TR: findCol(headers, 'Unvan(Türkçe)'),
-    UNVAN_RU: findCol(headers, 'Unvan(Rusça)'),
+    UNVAN_TR: findUnvanCol(headers, 'tr'),
+    UNVAN_RU: findUnvanCol(headers, 'ru'),
     CINSIYET: findCol(headers, 'Cinsiyet'),
     UYRUK: findCol(headers, 'Uyruk'),
     TELEFON: findCol(headers, 'Cep Telefonu'),
@@ -137,8 +156,8 @@ function parseHRRows(values) {
 
     const telefon = row[COL.TELEFON] ? String(row[COL.TELEFON]) : '';
     const departman = row[COL.DEPARTMAN] ? String(row[COL.DEPARTMAN]) : '';
-    const unvanTR = String(row[COL.UNVAN_TR] || '').trim();
-    const unvanRU = String(row[COL.UNVAN_RU] || '').trim();
+    const unvanTR = COL.UNVAN_TR === -1 ? '' : String(row[COL.UNVAN_TR] || '').trim();
+    const unvanRU = COL.UNVAN_RU === -1 ? '' : String(row[COL.UNVAN_RU] || '').trim();
     const unvan = [unvanTR, unvanRU].filter(Boolean).join('/');
     const babaAdiRawKiril = String(row[COL.BABA_ADI] || '').trim();
     const babaAdi = helpers.transliterateCyrillicToLatin(babaAdiRawKiril);

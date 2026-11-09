@@ -1426,8 +1426,8 @@ function findCol_(headers, substr) {
   for (let i = 0; i < headers.length; i++) {
     if (normalizeForSearch_(headers[i]).indexOf(target) !== -1) return i;
   }
-  const preview = headers.slice(0, 6).map(function(h) { return '"' + h + '"'; }).join(', ');
-  throw new Error('HR Master Log\'da "' + substr + '" iceren bir sutun bulunamadi. Okunan ilk basliklar: ' + preview + (headers.length > 6 ? '...' : '') + ' (toplam ' + headers.length + ' sutun)');
+  const all = headers.map(function(h, i) { return (i + 1) + ':"' + normalizeForSearch_(h) + '"'; }).join(', ');
+  throw new Error('HR Master Log\'da "' + substr + '" iceren bir sutun bulunamadi. Tum basliklar (' + headers.length + ' sutun): ' + all);
 }
 
 // HR Master Log'un ilk birkac satirinda sirket adi/dokuman basligi gibi
@@ -1443,6 +1443,23 @@ function findHeaderRowIndex_(values) {
   throw new Error('HR Master Log\'un ilk 15 satirinda "Sicil No" iceren bir baslik satiri bulunamadi.');
 }
 
+// Aksan/Turkce harf farkini yok sayan esleme (U/Ü, ı/i ...) - "Unvan" basligi "Ünvan" olabiliyor.
+function foldForSearch_(s) {
+  return normalizeForSearch_(s).toLowerCase()
+    .replace(/[üÜ]/g, 'u').replace(/[ıİ]/g, 'i').replace(/[öÖ]/g, 'o')
+    .replace(/[şŞ]/g, 's').replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g');
+}
+// Unvan sutunu (lang 'tr' | 'ru'); bulunamazsa -1 (zorunlu degil).
+function findUnvanCol_(headers, lang) {
+  const isRu = function(f) { return f.indexOf('rusca') !== -1 || f.indexOf('рус') !== -1 || f.indexOf('(ru') !== -1; };
+  const isTr = function(f) { return f.indexOf('turkce') !== -1 || f.indexOf('тур') !== -1 || f.indexOf('(tr') !== -1; };
+  const cand = headers.map(function(h, i) { return { i: i, f: foldForSearch_(h) }; })
+    .filter(function(x) { return x.f.indexOf('unvan') !== -1 || x.f.indexOf('должност') !== -1 || x.f.indexOf('gorev') !== -1; });
+  const pick = cand.find(function(x) { return lang === 'ru' ? isRu(x.f) : isTr(x.f); })
+    || (lang === 'tr' ? cand.find(function(x) { return !isRu(x.f); }) : cand.find(function(x) { return isRu(x.f); }));
+  return pick ? pick.i : -1;
+}
+
 function buildColMap_(headers) {
   return {
     SICIL: findCol_(headers, 'Sicil No'),
@@ -1452,8 +1469,8 @@ function buildColMap_(headers) {
     AD_RU: findCol_(headers, 'Adı(Rusça)'),
     BABA_ADI: findCol_(headers, 'Baba ad'),
     YAKA: findCol_(headers, 'Yaka'),
-    UNVAN_TR: findCol_(headers, 'Unvan(Türkçe)'),
-    UNVAN_RU: findCol_(headers, 'Unvan(Rusça)'),
+    UNVAN_TR: findUnvanCol_(headers, 'tr'),
+    UNVAN_RU: findUnvanCol_(headers, 'ru'),
     CINSIYET: findCol_(headers, 'Cinsiyet'),
     UYRUK: findCol_(headers, 'Uyruk'),
     TELEFON: findCol_(headers, 'Cep Telefonu'),
@@ -1488,8 +1505,8 @@ function parseHRRows_(values) {
 
     const telefon = row[COL.TELEFON] ? String(row[COL.TELEFON]) : '';
     const departman = row[COL.DEPARTMAN] ? String(row[COL.DEPARTMAN]) : '';
-    const unvanTR = String(row[COL.UNVAN_TR] || '').trim();
-    const unvanRU = String(row[COL.UNVAN_RU] || '').trim();
+    const unvanTR = COL.UNVAN_TR === -1 ? '' : String(row[COL.UNVAN_TR] || '').trim();
+    const unvanRU = COL.UNVAN_RU === -1 ? '' : String(row[COL.UNVAN_RU] || '').trim();
     const unvan = [unvanTR, unvanRU].filter(Boolean).join('/');
     const babaAdiRawKiril = String(row[COL.BABA_ADI] || '').trim();
     const babaAdi = transliterateCyrillicToLatin_(babaAdiRawKiril);

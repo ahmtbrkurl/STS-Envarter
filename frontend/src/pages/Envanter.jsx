@@ -7,6 +7,8 @@ import AssetForm from './AssetForm.jsx';
 import { useLang, translateStatus, translateCategory } from '../i18n.jsx';
 import { timestampedFilename, downloadCsv, excelSafeText } from '../exportUtils.js';
 import { exportManagementReport } from '../managementReport.js';
+import Modal from '../components/Modal.jsx';
+import { buildMacExportRows } from '../macExport.js';
 import { buildNetworkDiagramHtml, downloadNetworkDiagram } from '../networkDiagram.js';
 
 const PAGE_SIZE = 10;
@@ -31,6 +33,10 @@ export default function Envanter() {
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [macModal, setMacModal] = useState(false);
+  const [macLoc, setMacLoc] = useState('');
+  const [macOnlyPc, setMacOnlyPc] = useState(true);
+  const [macMsg, setMacMsg] = useState('');
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const { lang, t } = useLang();
@@ -110,6 +116,17 @@ export default function Envanter() {
     }));
     const csv = Papa.unparse({ fields: headers, data: rows });
     downloadCsv(csv, timestampedFilename(t('nav_inventory'), 'csv'));
+  }
+
+  function downloadMacList() {
+    if (!macLoc) return;
+    const { csv, personCount } = buildMacExportRows({
+      items, employees, location: macLoc, onlyComputers: macOnlyPc,
+      labels: { phone: t('mac_export_phone'), person: t('mac_export_person'), deviceCount: t('mac_export_count'), no: t('mac_export_no'), deviceType: t('mac_export_type'), deviceId: t('mac_export_id'), deviceWord: t('mac_export_word') }
+    });
+    if (!personCount) { setMacMsg(t('mac_export_none')); return; }
+    setMacMsg('');
+    downloadCsv(csv, timestampedFilename('MAC-' + macLoc, 'csv'));
   }
 
   function handleImportClick() {
@@ -194,6 +211,7 @@ export default function Envanter() {
             {importing ? '...' : t('btn_import_csv')}
           </button>
           <button className="btn btn-ghost" onClick={exportCsv}>{t('btn_export_csv')}</button>
+          <button className="btn btn-ghost" onClick={() => { setMacMsg(''); setMacModal(true); }}>{`📶 ${t('mac_export_btn')}`}</button>
           <button className="btn btn-ghost" onClick={handleManagementReport} disabled={mgmtReportLoading}>
             {mgmtReportLoading ? '...' : `📊 ${t('mgmt_report_title')}`}
           </button>
@@ -203,6 +221,32 @@ export default function Envanter() {
           <button className="btn btn-primary" onClick={() => setShowForm(true)}>+ {t('btn_add')}</button>
         </div>
       </div>
+
+      {macModal && (
+        <Modal
+          title={t('mac_export_title')}
+          onClose={() => setMacModal(false)}
+          actions={(
+            <>
+              <button className="btn btn-ghost" onClick={() => setMacModal(false)}>{t('btn_close')}</button>
+              <button className="btn btn-primary" disabled={!macLoc} onClick={downloadMacList}>{t('mac_export_download')}</button>
+            </>
+          )}
+        >
+          <p style={{ fontSize: 13, marginTop: 0 }}>{t('mac_export_hint')}</p>
+          <div className="field">
+            <select value={macLoc} onChange={(e) => { setMacLoc(e.target.value); setMacMsg(''); }}>
+              <option value="">{t('mac_export_pick')}</option>
+              {(lists.Lokasyon || []).map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 10 }}>
+            <input type="checkbox" checked={macOnlyPc} onChange={(e) => setMacOnlyPc(e.target.checked)} />
+            {t('mac_export_only_pc')}
+          </label>
+          {macMsg && <div style={{ color: 'var(--danger, #c0392b)', fontSize: 13, marginTop: 10 }}>{macMsg}</div>}
+        </Modal>
+      )}
 
       {importMsg && <div className="card card-pad" style={{ marginBottom: 14, fontSize: 13 }}>{importMsg}</div>}
 
