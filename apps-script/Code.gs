@@ -884,7 +884,7 @@ function updateEmployee_(originalName, data) {
     const envSheet = ss_().getSheetByName(SHEETS.ENVANTER);
     const envLastRow = envSheet.getLastRow();
     if (envLastRow >= 2) {
-      const col = ENVANTER_HEADERS.indexOf('AtananKisi') + 1;
+      const col = getEffectiveHeaders_(envSheet, ENVANTER_HEADERS).indexOf('AtananKisi') + 1;
       const assignees = envSheet.getRange(2, col, envLastRow - 1, 1).getValues();
       assignees.forEach(function(r, i) {
         if (r[0] === originalName) envSheet.getRange(i + 2, col).setValue(data.AdSoyad);
@@ -893,7 +893,7 @@ function updateEmployee_(originalName, data) {
     const needSheet = ss_().getSheetByName(SHEETS.IHTIYACLAR);
     const needLastRow = needSheet ? needSheet.getLastRow() : 0;
     if (needLastRow >= 2) {
-      const col = IHTIYAC_HEADERS.indexOf('PersonelAdi') + 1;
+      const col = getEffectiveHeaders_(needSheet, IHTIYAC_HEADERS).indexOf('PersonelAdi') + 1;
       const names = needSheet.getRange(2, col, needLastRow - 1, 1).getValues();
       names.forEach(function(r, i) {
         if (r[0] === originalName) needSheet.getRange(i + 2, col).setValue(data.AdSoyad);
@@ -947,10 +947,14 @@ function importEmployees_(rows) {
   rows.forEach(function(row) {
     const idx = existing.findIndex(function(r) { return r[0] === row.AdSoyad; });
     const currentPersonelId = idx !== -1 && personelIdCol !== -1 ? existing[idx][personelIdCol] : '';
-    const newRow = headerRow.map(function(h) {
-      if (h === 'AktifMi') return row[h] || 'Aktif';
+    // Mevcut kayitta CSV'de olmayan/bos hucreler MEVCUT degeri korur.
+    const cur = idx !== -1 ? existing[idx] : null;
+    const newRow = headerRow.map(function(h, ci) {
+      const incomingVal = row[h];
+      const has = incomingVal !== undefined && incomingVal !== null && incomingVal !== '';
       if (h === 'PersonelID') return row[h] || currentPersonelId || nextPersonelId_();
-      return row[h] || '';
+      if (h === 'AktifMi') return has ? incomingVal : (cur && cur[ci]) || 'Aktif';
+      return has ? incomingVal : (cur && cur[ci] !== undefined ? cur[ci] : '');
     });
     if (idx !== -1) {
       sheet.getRange(idx + 2, 1, 1, headerRow.length).setValues([newRow]);
@@ -1397,7 +1401,7 @@ function normalizeDateStr_(raw) {
 // No yeniden kullanilmis olabilir" diye isaretlenir - otomatik karar
 // VERILMEZ, sadece kullaniciya sorulacak bir uyari uretilir.
 function namesOverlap_(nameA, nameB) {
-  const tokensOf = function(s) { return String(s || '').toLowerCase().split(/\s+/).filter(function(t) { return t.length >= 3; }); };
+  const tokensOf = function(s) { return foldForSearch_(s).split(/\s+/).filter(function(t) { return t.length >= 2; }); };
   const a = {};
   tokensOf(nameA).forEach(function(t) { a[t] = true; });
   return tokensOf(nameB).some(function(t) { return a[t]; });
@@ -1460,6 +1464,21 @@ function findUnvanCol_(headers, lang) {
   return pick ? pick.i : -1;
 }
 
+// Telefon karsilastirmasi icin yalniz rakamlar (bicim farki "degisiklik" sayilmasin).
+function phoneKey_(s) { return String(s || '').replace(/\D/g, ''); }
+// HR'da bos gelen alan IT'nin elle girdigi veriyi EZMEZ (diff'e girmez, yazilmaz).
+const KEEP_IF_EMPTY_ = ['Telefon', 'Departman', 'Unvan', 'BabaAdi', 'Cinsiyet', 'Uyruk', 'IseBaslamaTarihi'];
+function cleanDept_(s) { const t = String(s || '').trim(); return t === '-' ? '' : t; }
+function isVacant_(soyad, ad) { return /^vacant$/i.test(String(soyad || '').trim()) || /^vacant$/i.test(String(ad || '').trim()); }
+// Once Sicil No ile eslestir; isim yedegi SADECE kayitta Sicil No yoksa (veya ayniysa).
+function matchExisting_(bySicil, byName, sicilNo, adSoyad) {
+  const bs = sicilNo && bySicil[normalizeSicil_(sicilNo)];
+  if (bs) return bs;
+  const bn = byName[adSoyad];
+  if (bn && (!bn.SicilNo || !sicilNo || normalizeSicil_(bn.SicilNo) === normalizeSicil_(sicilNo))) return bn;
+  return null;
+}
+
 function buildColMap_(headers) {
   return {
     SICIL: findCol_(headers, 'Sicil No'),
@@ -1484,7 +1503,21 @@ function buildColMap_(headers) {
 // HR Master Log satirlarini islenmis "incoming" objelerine ve bu senkronda
 // gorulen Sicil No'larin kumesine cevirir - hem preview hem applyHRSync_'in
 // HRKayipSayaci guncellemesi icin ortak kullanilir.
+// HR "Статус/Durum" -> uygulamadaki AktifMi. "Отмена/Iptal" (ise girisi iptal
+// olan) ARTIK 'Iptal' olur - eskiden 'Beklemede'ye dusuyordu ve iptal olan kisi
+// yanlislikla bekleyen/aktif calisan gibi sayiliyordu. Iptal, cikis tarihi
+// dolu olsa bile Pasif'e ustun gelir (uygulamada Iptal tarihi de ayni alanda tutulur).
+function mapHRStatus_(durum, cikisTarihi) {
+  const d = String(durum || '');
+  if (/Отмена|\bIptal\b|İptal/i.test(d)) return 'Iptal';
+  if (cikisTarihi || /Уволен|Isten Ayrildi|İşten Ayrıldı/i.test(d)) return 'Pasif';
+  if (/Активный|Aktif/i.test(d)) return 'Aktif';
+  return 'Beklemede'; // Трансфер РНР/Visa, Прием приостановлен, bos vb.
+}
+
 function parseHRRows_(values) {
+  let hrTz = Session.getScriptTimeZone();
+  try { hrTz = getHRSheet_().getParent().getSpreadsheetTimeZone() || hrTz; } catch (e) { /* varsayilan */ }
   const headerRowIdx = findHeaderRowIndex_(values);
   const COL = buildColMap_(values[headerRowIdx]);
   const incomingList = [];
@@ -1493,18 +1526,19 @@ function parseHRRows_(values) {
 
   for (let i = headerRowIdx + 1; i < values.length; i++) {
     const row = values[i];
+    // "Gorulen Sicil" kumesi: yaka/isim filtresinden ONCE, sheet'teki TUM Sicil No'lar.
+    const sicilNo = String(row[COL.SICIL] || '').trim();
+    if (sicilNo) seenSicilSet[normalizeSicil_(sicilNo)] = true;
     const yaka = String(row[COL.YAKA] || '').trim();
     if (yaka.toLowerCase().indexOf('beyaz yaka') === -1) { skippedMaviYaka++; continue; }
 
     const ad = String(row[COL.AD] || '').trim();
     const soyad = String(row[COL.SOYAD] || '').trim();
-    if (!ad && !soyad) { skippedBossAd++; continue; }
+    if ((!ad && !soyad) || isVacant_(soyad, ad)) { skippedBossAd++; continue; }
     const adSoyad = (ad + ' ' + soyad).trim();
-    const sicilNo = String(row[COL.SICIL] || '').trim();
-    if (sicilNo) seenSicilSet[normalizeSicil_(sicilNo)] = true;
 
     const telefon = row[COL.TELEFON] ? String(row[COL.TELEFON]) : '';
-    const departman = row[COL.DEPARTMAN] ? String(row[COL.DEPARTMAN]) : '';
+    const departman = row[COL.DEPARTMAN] ? cleanDept_(row[COL.DEPARTMAN]) : '';
     const unvanTR = COL.UNVAN_TR === -1 ? '' : String(row[COL.UNVAN_TR] || '').trim();
     const unvanRU = COL.UNVAN_RU === -1 ? '' : String(row[COL.UNVAN_RU] || '').trim();
     const unvan = [unvanTR, unvanRU].filter(Boolean).join('/');
@@ -1515,17 +1549,15 @@ function parseHRRows_(values) {
     const emailBasvuruAdi = [soyadRu, adRu, babaAdiRawKiril].filter(Boolean).join(' ');
     const girisTarihiRaw = row[COL.GIRIS];
     const iseBaslamaTarihi = girisTarihiRaw
-      ? (girisTarihiRaw instanceof Date ? Utilities.formatDate(girisTarihiRaw, Session.getScriptTimeZone(), 'yyyy-MM-dd') : normalizeDateStr_(girisTarihiRaw))
+      ? (girisTarihiRaw instanceof Date ? Utilities.formatDate(girisTarihiRaw, hrTz, 'yyyy-MM-dd') : normalizeDateStr_(girisTarihiRaw))
       : '';
     const cikisTarihi = row[COL.CIKIS];
+    const cikisIso = cikisTarihi ? (cikisTarihi instanceof Date ? Utilities.formatDate(cikisTarihi, hrTz, 'yyyy-MM-dd') : normalizeDateStr_(cikisTarihi)) : '';
     const durum = String(row[COL.DURUM] || '');
 
-    let aktifMi;
-    if (cikisTarihi || /Уволен|Isten Ayrildi|İşten Ayrıldı/i.test(durum)) aktifMi = 'Pasif';
-    else if (/Активный|Aktif/i.test(durum)) aktifMi = 'Aktif';
-    else aktifMi = 'Beklemede';
+    const aktifMi = mapHRStatus_(durum, cikisTarihi);
 
-    incomingList.push({ SicilNo: sicilNo, AdSoyad: adSoyad, Telefon: telefon, Departman: departman, AktifMi: aktifMi, Unvan: unvan, BabaAdi: babaAdi, IseBaslamaTarihi: iseBaslamaTarihi, EmailBasvuruAdi: emailBasvuruAdi, Cinsiyet: String(row[COL.CINSIYET] || '').trim(), Uyruk: String(row[COL.UYRUK] || '').trim() });
+    incomingList.push({ SicilNo: sicilNo, AdSoyad: adSoyad, Telefon: telefon, Departman: departman, AktifMi: aktifMi, Unvan: unvan, BabaAdi: babaAdi, IseBaslamaTarihi: iseBaslamaTarihi, IstenAyrilmaTarihi: cikisIso, EmailBasvuruAdi: emailBasvuruAdi, Cinsiyet: String(row[COL.CINSIYET] || '').trim(), Uyruk: String(row[COL.UYRUK] || '').trim() });
   }
 
   return { incomingList: incomingList, seenSicilSet: seenSicilSet, skippedMaviYaka: skippedMaviYaka, skippedBossAd: skippedBossAd };
@@ -1551,21 +1583,24 @@ function previewHRSync_() {
   parsed.incomingList.forEach(function(incoming) {
     const sicilNo = incoming.SicilNo;
     const adSoyad = incoming.AdSoyad;
-    const current = (sicilNo && bySicil[normalizeSicil_(sicilNo)]) || byName[adSoyad];
+    const current = matchExisting_(bySicil, byName, sicilNo, adSoyad);
 
     if (!current) {
       let possibleDuplicateOf = null;
-      if (incoming.Telefon) {
-        const phoneMatch = currentEmployees.find(function(e) { return e.Telefon && String(e.Telefon) === String(incoming.Telefon); });
+      if (phoneKey_(incoming.Telefon)) {
+        const phoneMatch = currentEmployees.find(function(e) { return e.Telefon && phoneKey_(e.Telefon) === phoneKey_(incoming.Telefon); });
         if (phoneMatch) possibleDuplicateOf = phoneMatch.AdSoyad;
       }
       changes.push({ key: sicilNo || adSoyad, changeType: 'new', incoming: incoming, current: null, changedFields: [], possibleDuplicateOf: possibleDuplicateOf });
     } else {
       const changedFields = [];
       ['AdSoyad', 'Telefon', 'Departman', 'AktifMi', 'Unvan', 'BabaAdi', 'EmailBasvuruAdi', 'Cinsiyet', 'Uyruk'].forEach(function(f) {
-        if (String(current[f] || '') !== String(incoming[f] || '')) changedFields.push(f);
+        if (KEEP_IF_EMPTY_.indexOf(f) !== -1 && !String(incoming[f] || '').trim()) return;
+        const a = String(current[f] || ''), b = String(incoming[f] || '');
+        if (f === 'Telefon' ? phoneKey_(a) !== phoneKey_(b) : f === 'AdSoyad' ? foldForSearch_(a) !== foldForSearch_(b) : a !== b) changedFields.push(f);
       });
-      if (normalizeDateStr_(current.IseBaslamaTarihi) !== normalizeDateStr_(incoming.IseBaslamaTarihi)) changedFields.push('IseBaslamaTarihi');
+      if (incoming.IseBaslamaTarihi && normalizeDateStr_(current.IseBaslamaTarihi) !== normalizeDateStr_(incoming.IseBaslamaTarihi)) changedFields.push('IseBaslamaTarihi');
+      if (normalizeDateStr_(current.IstenAyrilmaTarihi) !== normalizeDateStr_(incoming.IstenAyrilmaTarihi)) changedFields.push('IstenAyrilmaTarihi');
       if (sicilNo && normalizeSicil_(current.SicilNo || '') !== normalizeSicil_(sicilNo)) changedFields.push('SicilNo');
       if (changedFields.length > 0) {
         // Isim degisiyor VE Sicil No zaten eslesmisse - eski/yeni isim
@@ -1618,23 +1653,25 @@ function applyHRSync_(items, user) {
         updateEmployee_(oldEmployee.AdSoyad, { AktifMi: 'Pasif', SicilNo: oldEmployee.SicilNo + ' (eski)' });
         reassigned++;
       }
-      createEmployee_({ AdSoyad: item.AdSoyad, Telefon: item.Telefon, Email: '', Departman: item.Departman, AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi, Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk });
+      createEmployee_({ AdSoyad: item.AdSoyad, Telefon: item.Telefon, Email: '', Departman: item.Departman, AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, IstenAyrilmaTarihi: item.IstenAyrilmaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi, Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk });
       created++;
       return;
     }
 
-    const existing = (item.SicilNo && bySicil[normalizeSicil_(item.SicilNo)]) || byName[item.AdSoyad];
+    const existing = matchExisting_(bySicil, byName, item.SicilNo, item.AdSoyad);
     if (existing) {
       // updateEmployee_ zaten AdSoyad degisikligini destekliyor (Envanter/Ihtiyaclar
       // referanslarini otomatik gunceller) - isim degismis olsa bile dogru calisir.
-      updateEmployee_(existing.AdSoyad, {
+      const payload = {
         AdSoyad: item.AdSoyad, Telefon: item.Telefon, Departman: item.Departman,
-        AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi,
+        AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, IstenAyrilmaTarihi: item.IstenAyrilmaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi,
         Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk
-      });
+      };
+      KEEP_IF_EMPTY_.forEach(function(f) { if (!String(payload[f] || '').trim()) delete payload[f]; });
+      updateEmployee_(existing.AdSoyad, payload);
       updated++;
     } else {
-      createEmployee_({ AdSoyad: item.AdSoyad, Telefon: item.Telefon, Email: '', Departman: item.Departman, AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi, Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk });
+      createEmployee_({ AdSoyad: item.AdSoyad, Telefon: item.Telefon, Email: '', Departman: item.Departman, AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi, IseBaslamaTarihi: item.IseBaslamaTarihi, IstenAyrilmaTarihi: item.IstenAyrilmaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi, Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk });
       created++;
     }
   });
@@ -1646,6 +1683,7 @@ function applyHRSync_(items, user) {
   try {
     const values2 = getHRSheet_().getDataRange().getValues();
     const parsed2 = parseHRRows_(values2);
+    if (!parsed2.incomingList.length) throw new Error('HR sheet bos/okunamadi - kayip sayaci guncellenmedi.');
     const freshEmployees = sheetToObjects_(SHEETS.CALISANLAR);
     freshEmployees.forEach(function(e) {
       if (!e.SicilNo || String(e.SicilNo).indexOf('(eski)') !== -1) return;

@@ -257,9 +257,24 @@ async function createEmployee(data) {
   return { message: 'Calisan eklendi.' };
 }
 
-// originalName ile eslesen satiri bulup gunceller - Code.gs'deki updateEmployee_
-// ile ayni. NOT: isim degisince Envanter/Ihtiyaclar'daki referanslarin da
-// guncellenmesi Apps Script'te var ama bu ilk surumde henuz port edilmedi.
+// Isim degisince Envanter.AtananKisi ve Ihtiyaclar.PersonelAdi referanslarini
+// yeni isme tasir (Code.gs'deki updateEmployee_ ile ayni) - baglanti kopmasin.
+async function renameEmployeeReferences(oldName, newName) {
+  const targets = [[SHEET_NAMES.ENVANTER, 'AtananKisi'], [SHEET_NAMES.IHTIYACLAR, 'PersonelAdi']];
+  for (const [sheetName, field] of targets) {
+    const rows = await sheets.getSheetValues(sheetName);
+    if (!rows.length) continue;
+    const col = rows[0].indexOf(field);
+    if (col === -1) continue;
+    const letter = sheets.columnLetter(col + 1);
+    for (let i = 1; i < rows.length; i++) {
+      if (rows[i][col] === oldName) await updateSingleCell(sheetName, `${letter}${i + 1}`, newName);
+    }
+    sheets.invalidateCache(sheetName);
+  }
+}
+
+// originalName ile eslesen satiri bulup gunceller - Code.gs'deki updateEmployee_ ile ayni.
 async function updateEmployee(originalName, data) {
   // Koda sonradan eklenen yeni calisan alanlari (orn. ErisimDosya) sheet'te yoksa sona eklenir.
   await getEffectiveHeaders(SHEET_NAMES.CALISANLAR, CALISAN_HEADERS);
@@ -284,6 +299,7 @@ async function updateEmployee(originalName, data) {
   const newRow = actualHeaders.map((h) => (!h ? '' : (data[h] !== undefined ? data[h] : current[h])));
   await sheets.updateRow(SHEET_NAMES.CALISANLAR, idx + 1, newRow);
   if (data.Departman) await addListItem('Departman', data.Departman);
+  if (data.AdSoyad && data.AdSoyad !== originalName) await renameEmployeeReferences(originalName, data.AdSoyad);
   return { message: 'Calisan guncellendi.' };
 }
 
@@ -1175,10 +1191,15 @@ async function importEmployees(rows) {
     }
     const currentPersonelId = idx !== -1 ? allRows[idx][personelIdCol] : '';
     const personelId = row.PersonelID || currentPersonelId || (await nextPersonelId());
-    const newRow = headers.map((h) => {
-      if (h === 'AktifMi') return row[h] || 'Aktif';
+    // Mevcut kayitta CSV'de olmayan/bos hucreler MEVCUT degeri korur (SicilNo, Firma,
+    // TalepSifresi vb. silinmesin; Iptal/Pasif kisi sessizce Aktif olmasin).
+    const cur = idx !== -1 ? allRows[idx] : null;
+    const newRow = headers.map((h, ci) => {
+      const incomingVal = row[h];
+      const has = incomingVal !== undefined && incomingVal !== null && incomingVal !== '';
       if (h === 'PersonelID') return personelId;
-      return row[h] || '';
+      if (h === 'AktifMi') return has ? incomingVal : (cur && cur[ci]) || 'Aktif';
+      return has ? incomingVal : (cur && cur[ci] !== undefined ? cur[ci] : '');
     });
     if (idx !== -1) {
       await sheets.updateRow(SHEET_NAMES.CALISANLAR, idx + 1, newRow);

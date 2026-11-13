@@ -762,7 +762,7 @@ export function LanguageProvider({ children }) {
   }
 
   function t(key) {
-    return DICT[key]?.[lang] || DICT[key]?.tr || key;
+    return DICT[key]?.[lang] ?? DICT[key]?.tr ?? key;
   }
 
   return (

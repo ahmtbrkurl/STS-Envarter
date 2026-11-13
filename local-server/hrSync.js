@@ -54,6 +54,35 @@ function findUnvanCol(headers, lang) {
   return pick ? pick.i : -1;
 }
 
+// HR "Статус/Durum" -> uygulamadaki AktifMi. "Отмена/Iptal" (ise girisi iptal
+// olan) ARTIK 'Iptal' olur - eskiden 'Beklemede'ye dusuyordu ve iptal olan kisi
+// yanlislikla bekleyen/aktif calisan gibi sayiliyordu. Iptal, cikis tarihi
+// dolu olsa bile Pasif'e ustun gelir (uygulamada Iptal tarihi de ayni alanda tutulur).
+function mapHRStatus(durum, cikisTarihi) {
+  const d = String(durum || '');
+  if (/Отмена|\bIptal\b|İptal/i.test(d)) return 'Iptal';
+  if (cikisTarihi || /Уволен|Isten Ayrildi|İşten Ayrıldı/i.test(d)) return 'Pasif';
+  if (/Активный|Aktif/i.test(d)) return 'Aktif';
+  return 'Beklemede'; // Трансфер РНР/Visa, Прием приостановлен, bos vb.
+}
+
+// Telefon karsilastirmasi icin yalniz rakamlar (bicim farki "degisiklik" sayilmasin).
+function phoneKey(s) { return String(s || '').replace(/\D/g, ''); }
+// HR'da bos gelen alan IT'nin elle girdigi veriyi EZMEZ (diff'e girmez, yazilmaz).
+const KEEP_IF_EMPTY = ['Telefon', 'Departman', 'Unvan', 'BabaAdi', 'Cinsiyet', 'Uyruk', 'IseBaslamaTarihi'];
+function cleanDept(s) { const t = String(s || '').trim(); return t === '-' ? '' : t; }
+function isVacant(soyad, ad) { return /^vacant$/i.test(String(soyad || '').trim()) || /^vacant$/i.test(String(ad || '').trim()); }
+
+// Once Sicil No ile eslestir. Isim yedegi SADECE kayitta Sicil No yoksa (veya ayniysa)
+// kullanilir - farkli Sicil'li ayni isimli eski kayit (yeniden ise alim) sessizce ezilmesin.
+function matchExisting(bySicil, byName, sicilNo, adSoyad) {
+  const bs = sicilNo && bySicil[normalizeSicil(sicilNo)];
+  if (bs) return bs;
+  const bn = byName[adSoyad];
+  if (bn && (!bn.SicilNo || !sicilNo || normalizeSicil(bn.SicilNo) === normalizeSicil(sicilNo))) return bn;
+  return null;
+}
+
 function buildColMap(headers) {
   return {
     SICIL: findCol(headers, 'Sicil No'),
@@ -108,7 +137,7 @@ function normalizeDateStr(raw) {
 // No yeniden kullanilmis olabilir" diye isaretlenir - otomatik karar
 // VERILMEZ, sadece kullaniciya sorulacak bir uyari uretilir.
 function namesOverlap(nameA, nameB) {
-  const tokensOf = (s) => String(s || '').toLowerCase().split(/\s+/).filter((t) => t.length >= 3);
+  const tokensOf = (s) => foldForSearch(s).split(/\s+/).filter((t) => t.length >= 2);
   const a = new Set(tokensOf(nameA));
   const b = tokensOf(nameB);
   return b.some((t) => a.has(t));
@@ -144,18 +173,20 @@ function parseHRRows(values) {
 
   for (let i = headerRowIdx + 1; i < values.length; i++) {
     const row = values[i];
+    // "Gorulen Sicil" kumesi: yaka/isim filtresinden ONCE, sheet'teki TUM Sicil No'lar
+    // (ismi bos ya da Mavi Yaka'ya gecen biri "HR'da kayip" sanilmasin).
+    const sicilNo = String(row[COL.SICIL] || '').trim();
+    if (sicilNo) seenSicilSet.add(normalizeSicil(sicilNo));
     const yaka = String(row[COL.YAKA] || '').trim();
     if (yaka.toLowerCase().indexOf('beyaz yaka') === -1) { skippedMaviYaka++; continue; }
 
     const ad = String(row[COL.AD] || '').trim();
     const soyad = String(row[COL.SOYAD] || '').trim();
-    if (!ad && !soyad) { skippedBossAd++; continue; }
+    if ((!ad && !soyad) || isVacant(soyad, ad)) { skippedBossAd++; continue; } // bos kadro (VACANT) calisan degildir
     const adSoyad = (ad + ' ' + soyad).trim();
-    const sicilNo = String(row[COL.SICIL] || '').trim();
-    if (sicilNo) seenSicilSet.add(normalizeSicil(sicilNo));
 
     const telefon = row[COL.TELEFON] ? String(row[COL.TELEFON]) : '';
-    const departman = row[COL.DEPARTMAN] ? String(row[COL.DEPARTMAN]) : '';
+    const departman = row[COL.DEPARTMAN] ? cleanDept(row[COL.DEPARTMAN]) : '';
     const unvanTR = COL.UNVAN_TR === -1 ? '' : String(row[COL.UNVAN_TR] || '').trim();
     const unvanRU = COL.UNVAN_RU === -1 ? '' : String(row[COL.UNVAN_RU] || '').trim();
     const unvan = [unvanTR, unvanRU].filter(Boolean).join('/');
@@ -168,10 +199,7 @@ function parseHRRows(values) {
     const cikisTarihi = row[COL.CIKIS];
     const durum = String(row[COL.DURUM] || '');
 
-    let aktifMi;
-    if (cikisTarihi || /Уволен|Isten Ayrildi|İşten Ayrıldı/i.test(durum)) aktifMi = 'Pasif';
-    else if (/Активный|Aktif/i.test(durum)) aktifMi = 'Aktif';
-    else aktifMi = 'Beklemede';
+    const aktifMi = mapHRStatus(durum, cikisTarihi);
 
     const cinsiyet = String(row[COL.CINSIYET] || '').trim();
     const uyruk = String(row[COL.UYRUK] || '').trim();
@@ -197,21 +225,23 @@ async function previewHRSync() {
   incomingList.forEach((incoming) => {
     const sicilNo = incoming.SicilNo;
     const adSoyad = incoming.AdSoyad;
-    const current = (sicilNo && bySicil[normalizeSicil(sicilNo)]) || byName[adSoyad];
+    const current = matchExisting(bySicil, byName, sicilNo, adSoyad);
 
     if (!current) {
       let possibleDuplicateOf = null;
-      if (incoming.Telefon) {
-        const phoneMatch = currentEmployees.find((e) => e.Telefon && String(e.Telefon) === String(incoming.Telefon));
+      if (phoneKey(incoming.Telefon)) {
+        const phoneMatch = currentEmployees.find((e) => e.Telefon && phoneKey(e.Telefon) === phoneKey(incoming.Telefon));
         if (phoneMatch) possibleDuplicateOf = phoneMatch.AdSoyad;
       }
       changes.push({ key: sicilNo || adSoyad, changeType: 'new', incoming, current: null, changedFields: [], possibleDuplicateOf });
     } else {
       const changedFields = [];
       ['AdSoyad', 'Telefon', 'Departman', 'AktifMi', 'Unvan', 'BabaAdi', 'EmailBasvuruAdi', 'Cinsiyet', 'Uyruk'].forEach((f) => {
-        if (String(current[f] || '') !== String(incoming[f] || '')) changedFields.push(f);
+        if (KEEP_IF_EMPTY.includes(f) && !String(incoming[f] || '').trim()) return;
+        const a = String(current[f] || ''), b = String(incoming[f] || '');
+        if (f === 'Telefon' ? phoneKey(a) !== phoneKey(b) : f === 'AdSoyad' ? foldForSearch(a) !== foldForSearch(b) : a !== b) changedFields.push(f);
       });
-      if (normalizeDateStr(current.IseBaslamaTarihi) !== normalizeDateStr(incoming.IseBaslamaTarihi)) changedFields.push('IseBaslamaTarihi');
+      if (incoming.IseBaslamaTarihi && normalizeDateStr(current.IseBaslamaTarihi) !== normalizeDateStr(incoming.IseBaslamaTarihi)) changedFields.push('IseBaslamaTarihi');
       if (normalizeDateStr(current.IstenAyrilmaTarihi) !== normalizeDateStr(incoming.IstenAyrilmaTarihi)) changedFields.push('IstenAyrilmaTarihi');
       if (sicilNo && normalizeSicil(current.SicilNo || '') !== normalizeSicil(sicilNo)) changedFields.push('SicilNo');
       if (changedFields.length > 0) {
@@ -260,14 +290,18 @@ async function applyHRSync(items, user) {
       continue;
     }
 
-    const existing = (item.SicilNo && bySicil[normalizeSicil(item.SicilNo)]) || byName[item.AdSoyad];
+    const existing = matchExisting(bySicil, byName, item.SicilNo, item.AdSoyad);
     if (existing) {
-      await helpers.updateEmployee(existing.AdSoyad, {
+      const payload = {
         AdSoyad: item.AdSoyad, Telefon: item.Telefon, Departman: item.Departman,
         AktifMi: item.AktifMi, SicilNo: item.SicilNo, Unvan: item.Unvan, BabaAdi: item.BabaAdi,
         IseBaslamaTarihi: item.IseBaslamaTarihi, IstenAyrilmaTarihi: item.IstenAyrilmaTarihi, EmailBasvuruAdi: item.EmailBasvuruAdi,
-        Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk, Firma: 'STS-Akkuyu'
-      });
+        Cinsiyet: item.Cinsiyet, Uyruk: item.Uyruk,
+        // Firma'yi sadece bos ise doldur - elle degistirilmis Firma ezilmesin.
+        ...(existing.Firma ? {} : { Firma: 'STS-Akkuyu' })
+      };
+      KEEP_IF_EMPTY.forEach((f) => { if (!String(payload[f] || '').trim()) delete payload[f]; });
+      await helpers.updateEmployee(existing.AdSoyad, payload);
       updated++;
     } else {
       await helpers.createEmployee({
@@ -288,7 +322,8 @@ async function applyHRSync(items, user) {
       hrKayipSayaciUyari = ' ⚠️ UYARI: "Calisanlar" sekmesinde "HRKayipSayaci" sutunu bulunamadi - HR kayip takibi calismiyor, bu sutunu eklemeniz gerekiyor.';
     } else {
       const values = await fetchHRRows();
-      const { seenSicilSet } = parseHRRows(values);
+      const { seenSicilSet, incomingList: hrNow } = parseHRRows(values);
+      if (hrNow.length === 0) throw new Error('HR sheet bos/okunamadi - kayip sayaci guncellenmedi.');
       const freshEmployees = await sheets.sheetToObjects(helpers.SHEET_NAMES.CALISANLAR);
       for (const e of freshEmployees) {
         if (!e.SicilNo || String(e.SicilNo).includes('(eski)')) continue;
@@ -311,4 +346,4 @@ async function applyHRSync(items, user) {
   return { created, updated, reassigned, message: summary };
 }
 
-module.exports = { previewHRSync, applyHRSync };
+module.exports = { previewHRSync, applyHRSync, mapHRStatus };

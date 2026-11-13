@@ -439,7 +439,7 @@ export default function Calisanlar() {
 
 function HRSyncModal({ changes, selected, onToggle, onSelectAllUpdates, onClose, onApply, applying, missingEmployees, onMarkInactive, differentPersonKeys, onSetDifferentPerson }) {
   const { t } = useLang();
-  const FIELD_LABELS = { AdSoyad: t('needs_col_person'), Telefon: t('col_phone'), Departman: t('col_department'), AktifMi: t('col_status'), SicilNo: t('col_sicil_no'), Unvan: t('col_title'), BabaAdi: t('col_father_name'), IseBaslamaTarihi: t('col_ise_baslama_tarihi'), EmailBasvuruAdi: t('col_email_basvuru_adi'), Cinsiyet: t('col_cinsiyet'), Uyruk: t('col_uyruk') };
+  const FIELD_LABELS = { AdSoyad: t('needs_col_person'), Telefon: t('col_phone'), Departman: t('col_department'), AktifMi: t('col_status'), SicilNo: t('col_sicil_no'), Unvan: t('col_title'), BabaAdi: t('col_father_name'), IseBaslamaTarihi: t('col_ise_baslama_tarihi'), IstenAyrilmaTarihi: t('col_isten_ayrilma_tarihi'), EmailBasvuruAdi: t('col_email_basvuru_adi'), Cinsiyet: t('col_cinsiyet'), Uyruk: t('col_uyruk') };
 
   return (
     <Modal

@@ -16,7 +16,10 @@ export function buildMacExportRows({ items, employees, location, onlyComputers, 
     byPerson.get(a.AtananKisi).push(a);
   });
   const empByName = new Map(employees.map((e) => [e.AdSoyad, e]));
-  const people = [...byPerson.keys()].sort((x, y) => x.localeCompare(y, 'tr'));
+  // Isten ayrilmis (Pasif) / girisi iptal olmus (Iptal) personel listede yer almasin.
+  const people = [...byPerson.keys()]
+    .filter((n) => !['Pasif', 'Iptal'].includes(empByName.get(n)?.AktifMi))
+    .sort((x, y) => x.localeCompare(y, 'tr'));
 
   const lines = [];
   let maxMacs = 2;
